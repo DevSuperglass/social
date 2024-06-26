@@ -1,10 +1,13 @@
 # Copyright 2024 Dixmit
 # License LGPL-3.0 or later (http://www.gnu.org/licenses/lgpl).
 
-import json
 import logging
-
+import json
+import random
 from odoo.http import Controller, request, route
+from datetime import datetime, date
+import datetime
+import requests.exceptions
 
 _logger = logging.getLogger(__name__)
 
@@ -34,6 +37,75 @@ class GatewayController(Controller):
                 .with_user(bot_data["webhook_user_id"])
                 ._receive_get_update(bot_data, request, **kwargs)
             )
+        current_date = date.today()
+
+        whats_id = request.httprequest.json['entry'][0]['changes'][0]['value']['messages'][0]['id']
+
+        mail_message_search = request.env['mail.message'].sudo().search([('whatsapp_id', '=like', whats_id)])
+        if mail_message_search:
+            return
+        numero = request.httprequest.json['entry'][0]['changes'][0]['value']['contacts'][0]['wa_id']
+        numero_formatado = "+{} {} {}-{}".format(numero[:2], numero[2:4], numero[4:9], numero[9:])
+        partner_name = request.httprequest.json['entry'][0]['changes'][0]['value']['contacts'][0]['profile']['name']
+        try:
+            button_template = request.httprequest.json['entry'][0]['changes'][0]['value']['messages'][0]['button'][
+                'payload']
+        except KeyError:
+            button_template = False
+
+        partner = request.env['res.partner'].sudo().search([('mobile', '=', numero_formatado)])
+
+        if not partner:
+            department_id = request.env['hr.department'].sudo().search(
+                [('complete_name', '=', 'SUPERGLASS / VENDAS')]).id
+            parent_id = request.env['category_request'].sudo().search([('name', '=', 'VENDAS')]).id
+            child_id = request.env['category_request'].sudo().search([('name', '=like', 'COTAÇÃO SOLICITADA')]).id
+
+            vals_list = {
+                'name': partner_name,
+                'mobile': numero_formatado,
+            }
+            request.env['res.partner'].sudo().create(vals_list)
+
+            new_partner_vals = {
+                'status': 'aberto',
+                'private_message': 'public',
+                'department_id': department_id,
+                'user_requested_id': False,
+                'category_parent_request_id': parent_id,
+                'category_child_request': child_id,
+                'boolean_client': True,
+                'description_problem': f'Novo contato {partner_name} com celular {numero_formatado} criado, entrar em contato para o completar o cadastro.',
+                'message_follower_ids': [],
+                'activity_ids': [],
+                'message_ids': [],
+                'request_client_ids': partner.ids,
+                'update_date': current_date,
+                'opening_date': current_date
+            }
+            gerproc_create = request.env["project_request"].create(new_partner_vals)
+
+        if button_template:
+            button_record = request.env['whatsapp.template.button'].sudo().search([('name', '=', button_template)],
+                                                                                  order='create_date desc', limit=1)
+            function_name = button_record.code
+            if function_name:
+                button_record.with_context(
+                    numero_formatado=numero_formatado,
+                    partner_name=partner_name,
+                    partner=partner,
+                    function_name=function_name,
+                    current_date=current_date
+                ).call_function()
+            else:
+                print("Button template not found")
+
+        change_status = request.env['crm.lead'].sudo().search(
+            [('phone', '=', numero_formatado), ('new_status', '=', 'draft'), ('remove_button', '=', False)])
+        if change_status.phone == numero_formatado:
+            change_status.new_status = 'in_progress'
+            change_status.remove_button = True
+
         bot_data = request.env["mail.gateway"]._get_gateway(
             token, gateway_type=usage, state="integrated"
         )
