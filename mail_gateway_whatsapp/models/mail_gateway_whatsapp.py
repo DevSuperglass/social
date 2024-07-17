@@ -137,7 +137,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             pass
         if len(body) > 0 or attachments:
             author = self._get_author(chat.gateway_id, value)
-            new_message = chat.with_context({'from_webhook': True}).message_post(
+            new_message = chat.message_post(
                 body=body,
                 author_id=author and author._name == "res.partner" and author.id,
                 gateway_type="whatsapp",
@@ -164,7 +164,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     new_related_message = (
                         self.env[related_message.gateway_message_id.model]
                         .browse(related_message.gateway_message_id.res_id)
-                        .with_context({'from_webhook': True}).message_post(
+                        .message_post(
                             body=body,
                             author_id=author
                             and author._name == "res.partner"
