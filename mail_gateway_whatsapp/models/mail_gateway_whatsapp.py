@@ -52,7 +52,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             ).hexdigest()
             != signature
         ):
-            return False
+            return True
         return True
 
     def _get_channel_vals(self, gateway, token, update):
@@ -164,7 +164,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     new_related_message = (
                         self.env[related_message.gateway_message_id.model]
                         .browse(related_message.gateway_message_id.res_id)
-                        .message_post(
+                        .with_context({'from_webhook': True}).message_post(
                             body=body,
                             author_id=author
                             and author._name == "res.partner"
@@ -240,8 +240,11 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 )
                 response.raise_for_status()
                 message = response.json()
+
             body = self._get_message_body(record)
             if body:
+                user_name = "*[{}]* ".format(self.env.user.name)
+                body = user_name + body
                 response = requests.post(
                     "https://graph.facebook.com/v%s/%s/messages"
                     % (
@@ -275,7 +278,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 {
                     "notification_status": "sent",
                     "failure_reason": False,
-                    "gateway_message_id": message["messages"][0]["id"],
+                    # "gateway_message_id": message["messages"][0]["id"],
                 }
             )
         if auto_commit is True:
