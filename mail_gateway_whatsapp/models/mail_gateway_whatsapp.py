@@ -63,7 +63,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 continue
         return result
 
-    def _receive_update(self, gateway, update):
+    def _receive_update(self, gateway, update, whats_id):
         if update:
             for entry in update["entry"]:
                 for change in entry["changes"]:
@@ -75,9 +75,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         )
                         if not chat:
                             continue
-                        self._process_update(chat, message, change["value"])
+                        self._process_update(chat, message, change["value"], whats_id)
 
-    def _process_update(self, chat, message, value):
+    def _process_update(self, chat, message, value, whats_id):
         chat.ensure_one()
         body = ""
         attachments = []
@@ -146,6 +146,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 subtype_xmlid="mail.mt_comment",
                 message_type="comment",
                 attachments=attachments,
+                whatsapp_id=whats_id
             )
             self._post_process_message(new_message, chat)
             related_message_id = message.get("context", {}).get("id", False)
@@ -175,6 +176,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                             subtype_xmlid="mail.mt_comment",
                             message_type="comment",
                             attachments=attachments,
+                            whatsapp_id=whats_id
                         )
                     )
                     self._post_process_reply(related_message)
@@ -281,6 +283,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     # "gateway_message_id": message["messages"][0]["id"],
                 }
             )
+            # Atualizar o campo whatsapp_id no modelo mail.message
+            record.mail_message_id.sudo().write({'whatsapp_id': message["messages"][0]["id"]})
+
         if auto_commit is True:
             # pylint: disable=invalid-commit
             self.env.cr.commit()
