@@ -41,8 +41,9 @@ class GatewayController(Controller):
                     request.httprequest.get_data().decode(request.httprequest.charset)
                 )
         current_date = date.today()
-
+        whats_id = request.httprequest.json['entry'][0]['changes'][0]['value']['messages'][0]['id']
         entry = jsonrequest.get('entry', [])
+        _logger.info(entry)
         if not entry:
             _logger.error("No entry found in jsonrequest")
             return
@@ -63,21 +64,21 @@ class GatewayController(Controller):
         if not messages and statuses:
             _logger.debug("Received a status update, not processing further.")
             return
-        
+
         if not messages:
             _logger.error("No messages found in value")
             return
-        
+
         contacts = value.get('contacts', [])
         if not contacts:
             _logger.error("No contacts found in value")
             return
-        
+
         numero = contacts[0].get('wa_id')
         if not numero:
             _logger.error("No wa_id found in contacts")
             return
-        
+
         numero_formatado = "+{} {} {}-{}".format(numero[:2], numero[2:4], numero[4:9], numero[9:])
         partner_name = jsonrequest['entry'][0]['changes'][0]['value']['contacts'][0]['profile']['name']
 
@@ -97,7 +98,7 @@ class GatewayController(Controller):
             }
             request.env['res.partner'].sudo().create(vals_list)
             partner = request.env['res.partner'].sudo().search([('mobile', '=', numero_formatado)])
-            
+
             new_partner_vals = {
                 'status': 'aberto',
                 'private_message': 'public',
@@ -151,17 +152,17 @@ class GatewayController(Controller):
                     ("Content-Type", "application/json"),
                 ],
             )
-        
+
         jsonrequest = json.loads(
             request.httprequest.get_data().decode(request.httprequest.charset)
         )
-        
+
         dispatcher = (
             request.env["mail.gateway.%s" % usage]
             .with_user(bot_data["webhook_user_id"])
             .with_context(no_gateway_notification=True)
         )
-        
+
         if not dispatcher._verify_update(bot_data, jsonrequest):
             _logger.warning(
                 "Message could not be verified for token %s with usage %s", token, usage
@@ -179,8 +180,8 @@ class GatewayController(Controller):
             json.dumps(jsonrequest),
         )
         gateway = dispatcher.env["mail.gateway"].browse(bot_data["id"])
-        dispatcher._receive_update(gateway, jsonrequest)
-        
+        dispatcher._receive_update(gateway, jsonrequest, whats_id)
+
         return request.make_response(
             json.dumps({}),
             [
