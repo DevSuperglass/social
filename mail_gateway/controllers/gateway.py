@@ -41,7 +41,7 @@ class GatewayController(Controller):
                     request.httprequest.get_data().decode(request.httprequest.charset)
                 )
         current_date = date.today()
-        whats_id = request.httprequest.json['entry'][0]['changes'][0]['value']['messages'][0]['id']
+        
         entry = jsonrequest.get('entry', [])
 
         _logger.info(entry)
@@ -69,6 +69,11 @@ class GatewayController(Controller):
         if not messages:
             _logger.error("No messages found in value")
             return
+        
+        whats_id = messages[0].get('id')
+        if not whats_id:
+            _logger.error("No id found in messages")
+            return
 
         contacts = value.get('contacts', [])
         if not contacts:
@@ -87,9 +92,9 @@ class GatewayController(Controller):
             context = message.get('context', {})
             if context:
                 context_id = context.get('id')
-                reply_id = request.env['mail.message'].sudo().search([('whatsapp_id', '=', context_id)]).parent_id
+                reply_id = request.env['mail.message'].sudo().search([('whatsapp_id', '=like', context_id)]).id
                 _logger.info(f"Context ID found: {context_id}")
-                break
+                _logger.info(f'Reply ID found: {reply_id}')
 
         if not context_id:
             _logger.info("No context ID found in messages.")
