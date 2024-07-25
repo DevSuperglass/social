@@ -43,6 +43,7 @@ class GatewayController(Controller):
         current_date = date.today()
         whats_id = request.httprequest.json['entry'][0]['changes'][0]['value']['messages'][0]['id']
         entry = jsonrequest.get('entry', [])
+
         _logger.info(entry)
         if not entry:
             _logger.error("No entry found in jsonrequest")
@@ -78,6 +79,20 @@ class GatewayController(Controller):
         if not numero:
             _logger.error("No wa_id found in contacts")
             return
+
+        context_id = None
+        reply_id = None
+
+        for message in messages:
+            context = message.get('context', {})
+            if context:
+                context_id = context.get('id')
+                reply_id = request.env['mail.message'].sudo().search([('whatsapp_id', '=', context_id)]).parent_id
+                _logger.info(f"Context ID found: {context_id}")
+                break
+
+        if not context_id:
+            _logger.info("No context ID found in messages.")
 
         numero_formatado = "+{} {} {}-{}".format(numero[:2], numero[2:4], numero[4:9], numero[9:])
         partner_name = jsonrequest['entry'][0]['changes'][0]['value']['contacts'][0]['profile']['name']
@@ -180,7 +195,7 @@ class GatewayController(Controller):
             json.dumps(jsonrequest),
         )
         gateway = dispatcher.env["mail.gateway"].browse(bot_data["id"])
-        dispatcher._receive_update(gateway, jsonrequest, whats_id)
+        dispatcher._receive_update(gateway, jsonrequest, whats_id, reply_id)
 
         return request.make_response(
             json.dumps({}),
