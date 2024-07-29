@@ -63,7 +63,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 continue
         return result
 
-    def _receive_update(self, gateway, update, whats_id, reply_id):
+    def _receive_update(self, gateway, update, whats_id, reply_id, from_webhoook):
         if update:
             for entry in update["entry"]:
                 for change in entry["changes"]:
@@ -75,9 +75,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         )
                         if not chat:
                             continue
-                        self._process_update(chat, message, change["value"], whats_id, reply_id)
+                        self._process_update(chat, message, change["value"], whats_id, reply_id, from_webhoook)
 
-    def _process_update(self, chat, message, value, whats_id, reply_id):
+    def _process_update(self, chat, message, value, whats_id, reply_id, from_webhoook):
         chat.ensure_one()
         body = ""
         attachments = []
@@ -147,7 +147,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 message_type="comment",
                 attachments=attachments,
                 parent_id=reply_id,
-                whatsapp_id=whats_id
+                whatsapp_id=whats_id,
+                from_webhoook=from_webhoook
             )
             self._post_process_message(new_message, chat)
             related_message_id = message.get("context", {}).get("id", False)
@@ -178,7 +179,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
                             message_type="comment",
                             attachments=attachments,
                             parent_id=reply_id,
-                            whatsapp_id=whats_id
+                            whatsapp_id=whats_id,
+                            from_webhoook=from_webhoook
                         )
                     )
                     self._post_process_reply(related_message)
