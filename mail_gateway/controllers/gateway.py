@@ -64,8 +64,8 @@ class GatewayController(Controller):
 
         context_id = None
         reply_id = None
-        from_webhoook = True
-
+        from_webhook = True
+	
         for message in messages:
             context = message.get('context', {})
             if context:
@@ -173,7 +173,7 @@ class GatewayController(Controller):
             json.dumps(jsonrequest),
         )
         gateway = dispatcher.env["mail.gateway"].browse(bot_data["id"])
-        dispatcher._receive_update(gateway, jsonrequest, whats_id, reply_id, from_webhoook)
+        dispatcher._receive_update(gateway, jsonrequest, whats_id, reply_id, from_webhook)
 
         return request.make_response(
             json.dumps({}),
