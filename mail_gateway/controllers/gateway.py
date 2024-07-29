@@ -41,63 +41,36 @@ class GatewayController(Controller):
                     request.httprequest.get_data().decode(request.httprequest.charset)
                 )
         current_date = date.today()
-        
+
         entry = jsonrequest.get('entry', [])
 
-        _logger.info(entry)
-        if not entry:
-            _logger.error("No entry found in jsonrequest")
-            return
-
         changes = entry[0].get('changes', [])
-        if not changes:
-            _logger.error("No changes found in entry")
-            return
 
         value = changes[0].get('value', {})
-        if not value:
-            _logger.error("No value found in changes")
-            return
 
         messages = value.get('messages', [])
+
         statuses = value.get('statuses', [])
 
         if not messages and statuses:
             _logger.debug("Received a status update, not processing further.")
             return
 
-        if not messages:
-            _logger.error("No messages found in value")
-            return
-        
         whats_id = messages[0].get('id')
-        if not whats_id:
-            _logger.error("No id found in messages")
-            return
 
         contacts = value.get('contacts', [])
-        if not contacts:
-            _logger.error("No contacts found in value")
-            return
 
         numero = contacts[0].get('wa_id')
-        if not numero:
-            _logger.error("No wa_id found in contacts")
-            return
 
         context_id = None
         reply_id = None
+        from_webhoook = True
 
         for message in messages:
             context = message.get('context', {})
             if context:
                 context_id = context.get('id')
                 reply_id = request.env['mail.message'].sudo().search([('whatsapp_id', '=like', context_id)]).id
-                _logger.info(f"Context ID found: {context_id}")
-                _logger.info(f'Reply ID found: {reply_id}')
-
-        if not context_id:
-            _logger.info("No context ID found in messages.")
 
         numero_formatado = "+{} {} {}-{}".format(numero[:2], numero[2:4], numero[4:9], numero[9:])
         partner_name = jsonrequest['entry'][0]['changes'][0]['value']['contacts'][0]['profile']['name']
@@ -200,7 +173,7 @@ class GatewayController(Controller):
             json.dumps(jsonrequest),
         )
         gateway = dispatcher.env["mail.gateway"].browse(bot_data["id"])
-        dispatcher._receive_update(gateway, jsonrequest, whats_id, reply_id)
+        dispatcher._receive_update(gateway, jsonrequest, whats_id, reply_id, from_webhoook)
 
         return request.make_response(
             json.dumps({}),
