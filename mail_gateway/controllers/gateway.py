@@ -44,8 +44,6 @@ class GatewayController(Controller):
 
         entry = jsonrequest.get('entry', [])
 
-        entry_id = entry[0].get('id', [])
-
         changes = entry[0].get('changes', [])
 
         value = changes[0].get('value', {})
@@ -113,8 +111,7 @@ class GatewayController(Controller):
             gerproc_create = request.env["project_request"].sudo().create(new_partner_vals)
 
         if button_template:
-            whatsapp_template_id = request.env['whatsapp.template'].sudo().search([('template_id', '=', entry_id)]).id
-            button_record = request.env['whatsapp.template.button'].sudo().search([('name', '=', button_template), ('whatsapp_template_id', '=', whatsapp_template_id)])
+            button_record = request.env['whatsapp.template.button'].sudo().search([('name', '=', button_template)])
             function_name = button_record.code
             if function_name:
                 button_record.with_context(
