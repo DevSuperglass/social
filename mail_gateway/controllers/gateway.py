@@ -44,6 +44,8 @@ class GatewayController(Controller):
 
         entry = jsonrequest.get('entry', [])
 
+        entry_id = entry[0].get('id', [])
+
         changes = entry[0].get('changes', [])
 
         value = changes[0].get('value', {})
@@ -64,7 +66,7 @@ class GatewayController(Controller):
 
         context_id = None
         reply_id = None
-        from_webhoook = True
+        from_webhook = True
 
         for message in messages:
             context = message.get('context', {})
@@ -111,8 +113,8 @@ class GatewayController(Controller):
             gerproc_create = request.env["project_request"].sudo().create(new_partner_vals)
 
         if button_template:
-            button_record = request.env['whatsapp.template.button'].sudo().search([('name', '=', button_template)],
-                                                                                  order='create_date desc', limit=1)
+            whatsapp_template_id = request.env['whatsapp.template'].sudo().search([('template_id', '=', entry_id)]).id
+            button_record = request.env['whatsapp.template.button'].sudo().search([('name', '=', button_template), ('whatsapp_template_id', '=', whatsapp_template_id)])
             function_name = button_record.code
             if function_name:
                 button_record.with_context(
@@ -126,10 +128,10 @@ class GatewayController(Controller):
                 print("Button template not found")
 
         # change_status = request.env['crm.lead'].sudo().search(
-            # [('phone', '=', numero_formatado), ('new_status', '=', 'draft'), ('remove_button', '=', False)])
+        #     [('phone', '=', numero_formatado), ('new_status', '=', 'draft'), ('remove_button', '=', False)])
         # if change_status.phone == numero_formatado:
-            # change_status.new_status = 'in_progress'
-            # change_status.remove_button = True
+        #     change_status.new_status = 'in_progress'
+        #     change_status.remove_button = True
 
         bot_data = request.env["mail.gateway"]._get_gateway(
             token, gateway_type=usage, state="integrated"
@@ -173,7 +175,7 @@ class GatewayController(Controller):
             json.dumps(jsonrequest),
         )
         gateway = dispatcher.env["mail.gateway"].browse(bot_data["id"])
-        dispatcher._receive_update(gateway, jsonrequest, whats_id, reply_id, from_webhoook)
+        dispatcher._receive_update(gateway, jsonrequest, whats_id, reply_id, from_webhook)
 
         return request.make_response(
             json.dumps({}),
