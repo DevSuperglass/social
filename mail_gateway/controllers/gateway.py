@@ -111,7 +111,9 @@ class GatewayController(Controller):
             gerproc_create = request.env["project_request"].sudo().create(new_partner_vals)
 
         if button_template:
-            button_record = request.env['whatsapp.template.button'].sudo().search([('name', '=', button_template)])
+            template_id = request.env['whatsapp.template'].sudo().search([('wa_ids.wa_id', 'ilike', context_id)]).id
+            button_record = request.env['whatsapp.template.button'].sudo().search(
+                [('name', '=', button_template), ('whatsapp_template_id', '=', template_id)])
             function_name = button_record.code
             if function_name:
                 button_record.with_context(
