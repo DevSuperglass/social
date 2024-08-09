@@ -122,7 +122,8 @@ class GatewayController(Controller):
                     partner=partner,
                     function_name=function_name,
                     current_date=current_date,
-                    json=entry
+                    json=entry,
+                    waid=context_id
                 ).call_function()
             else:
                 print("Button template not found")
