@@ -118,6 +118,7 @@ class GatewayController(Controller):
             if function_name:
                 button_record.with_context(
                     numero_formatado=numero_formatado,
+                    button=button_template,
                     partner_name=partner_name,
                     partner=partner,
                     function_name=function_name,
