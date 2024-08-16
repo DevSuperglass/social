@@ -130,7 +130,7 @@ class GatewayController(Controller):
                 print("Button template not found")
 
         change_status = request.env['crm.lead'].sudo().search(
-            [('mobile', '=', numero_formatado), ('new_status', '=', 'draft'), ('remove_button', '=', False)])
+            [('mobile', '=', numero_formatado), ('new_status', '=', 'draft')])
         if change_status.mobile == numero_formatado:
             change_status.new_status = 'in_progress'
             change_status.remove_button = True
