@@ -131,7 +131,7 @@ class GatewayController(Controller):
 
         change_status = request.env['crm.lead'].sudo().search(
             [('mobile', '=', numero_formatado), ('new_status', '=', 'draft'), ('remove_button', '=', False)])
-        if change_status.phone == numero_formatado:
+        if change_status.mobile == numero_formatado:
             change_status.new_status = 'in_progress'
             change_status.remove_button = True
 
