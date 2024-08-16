@@ -82,8 +82,8 @@ class GatewayController(Controller):
         if not partner:
             department_id = request.env['hr.department'].sudo().search(
                 [('complete_name', '=', 'SUPERGLASS / VENDAS')]).id
-            parent_id = request.env['category_request'].sudo().search([('name', '=', 'VENDAS')]).id
-            child_id = request.env['category_request'].sudo().search([('name', '=like', 'COTAÇÃO SOLICITADA')]).id
+            parent_id = request.env['category_request'].sudo().search([('name', '=', 'CADASTRO DE CELULAR')]).id
+            child_id = request.env['category_request'].sudo().search([('name', '=like', 'ATUALIZAR NÚMERO DE CELULAR')]).id
 
             vals_list = {
                 'name': partner_name,
@@ -129,11 +129,11 @@ class GatewayController(Controller):
             else:
                 print("Button template not found")
 
-        # change_status = request.env['crm.lead'].sudo().search(
-        #     [('phone', '=', numero_formatado), ('new_status', '=', 'draft'), ('remove_button', '=', False)])
-        # if change_status.phone == numero_formatado:
-        #     change_status.new_status = 'in_progress'
-        #     change_status.remove_button = True
+        change_status = request.env['crm.lead'].sudo().search(
+            [('mobile', '=', numero_formatado), ('new_status', '=', 'draft'), ('remove_button', '=', False)])
+        if change_status.phone == numero_formatado:
+            change_status.new_status = 'in_progress'
+            change_status.remove_button = True
 
         bot_data = request.env["mail.gateway"]._get_gateway(
             token, gateway_type=usage, state="integrated"
