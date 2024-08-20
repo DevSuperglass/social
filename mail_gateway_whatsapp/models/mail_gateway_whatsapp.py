@@ -75,6 +75,12 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         )
                         if not chat:
                             continue
+                        message_type = message.get("type")
+                        if message_type == "button":
+                            button_payload = message.get("button", {}).get("payload")
+                            if button_payload:
+                                text_from_payload = button_payload
+                                message['payload_text'] = text_from_payload
                         self._process_update(chat, message, change["value"], whats_id, reply_id, from_webhook)
 
     def _process_update(self, chat, message, value, whats_id, reply_id, from_webhook):
@@ -83,6 +89,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
         attachments = []
         if message.get("text"):
             body = message.get("text").get("body")
+        if message.get("payload_text"):
+            body = message['payload_text']
         for key in ["image", "audio", "video", "document", "sticker"]:
             if message.get(key):
                 image_id = message.get(key).get("id")
