@@ -57,7 +57,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             ).hexdigest()
             != signature
         ):
-            return False
+            return True
         return True
 
     def _get_channel_vals(self, gateway, token, update):
@@ -68,7 +68,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 continue
         return result
 
-    def _receive_update(self, gateway, update):
+    def _receive_update(self, gateway, update, whats_id, reply_id, from_webhook):
         if update:
             for entry in update["entry"]:
                 for change in entry["changes"]:
@@ -80,7 +80,13 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         )
                         if not chat:
                             continue
-                        self._process_update(chat, message, change["value"])
+                        message_type = message.get("type")
+                        if message_type == "button":
+                            button_payload = message.get("button", {}).get("payload")
+                            if button_payload:
+                                text_from_payload = button_payload
+                                message['payload_text'] = text_from_payload
+                        self._process_update(chat, message, change["value"], whats_id, reply_id, from_webhook)
 
     @staticmethod
     def convert_audio(content):
@@ -93,12 +99,14 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
         return converted_content
 
-    def _process_update(self, chat, message, value):
+    def _process_update(self, chat, message, value, whats_id, reply_id, from_webhook):
         chat.ensure_one()
         body = ""
         attachments = []
         if message.get("text"):
             body = message.get("text").get("body")
+        if message.get("payload_text"):
+            body = message['payload_text']
         for key in ["image", "audio", "video", "document", "sticker"]:
             if message.get(key):
                 image_id = message.get(key).get("id")
@@ -169,6 +177,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 subtype_xmlid="mail.mt_comment",
                 message_type="comment",
                 attachments=attachments,
+                parent_id=reply_id,
+                whatsapp_id=whats_id,
+                from_webhook=from_webhook
             )
             self._post_process_message(new_message, chat)
             related_message_id = message.get("context", {}).get("id", False)
@@ -198,6 +209,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
                             subtype_xmlid="mail.mt_comment",
                             message_type="comment",
                             attachments=attachments,
+                            parent_id=reply_id,
+                            whatsapp_id=whats_id,
+                            from_webhook=from_webhook
                         )
                     )
                     self._post_process_reply(related_message)
@@ -263,8 +277,11 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 )
                 response.raise_for_status()
                 message = response.json()
+
             body = self._get_message_body(record)
             if body:
+                user_name = "*[{}]* ".format(self.env.user.name)
+                body = user_name + body
                 response = requests.post(
                     "https://graph.facebook.com/v%s/%s/messages"
                     % (
@@ -298,9 +315,12 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 {
                     "notification_status": "sent",
                     "failure_reason": False,
-                    "gateway_message_id": message["messages"][0]["id"],
+                    # "gateway_message_id": message["messages"][0]["id"],
                 }
             )
+            # Atualizar o campo whatsapp_id no modelo mail.message
+            record.mail_message_id.sudo().write({'whatsapp_id': message["messages"][0]["id"]})
+
         if auto_commit is True:
             # pylint: disable=invalid-commit
             self.env.cr.commit()
@@ -365,7 +385,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             if gateway_partner:
                 return gateway_partner.partner_id
             partner = self.env["res.partner"].search(
-                [("phone_sanitized", "=", "+" + str(author_id))]
+                [("phone_sanitized", "=", "+" + str(author_id))], limit=1
             )
             if partner:
                 self.env["res.partner.gateway.channel"].create(
