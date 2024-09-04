@@ -18,6 +18,11 @@ from odoo.tools import html2plaintext
 
 from odoo.addons.base.models.ir_mail_server import MailDeliveryException
 
+# PROPRIETÁRIO
+import base64
+from io import BytesIO
+from pydub import AudioSegment
+
 _logger = logging.getLogger(__name__)
 
 
@@ -83,6 +88,17 @@ class MailGatewayWhatsappService(models.AbstractModel):
                                 message['payload_text'] = text_from_payload
                         self._process_update(chat, message, change["value"], whats_id, reply_id, from_webhook)
 
+    @staticmethod
+    def convert_audio(content):
+        ogg_audio = AudioSegment.from_file(BytesIO(content), format="ogg")
+
+        mp3_io = BytesIO()
+        ogg_audio.export(mp3_io, format="mp3")
+
+        converted_content = mp3_io.getvalue()
+
+        return converted_content
+
     def _process_update(self, chat, message, value, whats_id, reply_id, from_webhook):
         chat.ensure_one()
         body = ""
@@ -123,13 +139,20 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     proxies=self._get_proxies(),
                 )
                 image_request.raise_for_status()
+
+                converted_audio = None
+
+                if key == 'audio':
+                    image_info['mime_type'] = 'audio/mpeg'
+                    converted_audio = self.convert_audio(content=image_request.content)
+
                 attachments.append(
                     (
                         "{}{}".format(
                             image_id,
                             mimetypes.guess_extension(image_info["mime_type"]),
                         ),
-                        image_request.content,
+                        image_request.content if key != 'audio' else converted_audio,
                     )
                 )
         if message.get("location"):
