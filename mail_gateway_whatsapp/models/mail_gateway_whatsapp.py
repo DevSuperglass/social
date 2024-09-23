@@ -328,25 +328,45 @@ class MailGatewayWhatsappService(models.AbstractModel):
     def _send_payload(
         self, channel, body=False, media_id=False, media_type=False, media_name=False
     ):
+        last_message = self.env['mail.message'].search([
+            ('model', '=', 'mail.channel'),
+            ('res_id', '=', channel.id)
+        ], order='create_date desc', limit=1)
+
+        context_data = {}
+
+        if last_message.parent_id:
+            context_data = {
+                "context": {
+                    "message_id": last_message.parent_id.whatsapp_id
+                }
+            }
+
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": channel.gateway_channel_token,
+        }
+
         if body:
-            return {
-                "messaging_product": "whatsapp",
-                "recipient_type": "individual",
-                "to": channel.gateway_channel_token,
+            payload.update({
                 "type": "text",
                 "text": {"preview_url": False, "body": html2plaintext(body)},
-            }
+            })
+
         if media_id:
             media_data = {"id": media_id}
             if media_type == "document":
                 media_data["filename"] = media_name
-            return {
-                "messaging_product": "whatsapp",
-                "recipient_type": "individual",
-                "to": channel.gateway_channel_token,
+            payload.update({
                 "type": media_type,
                 media_type: media_data,
-            }
+            })
+
+        if context_data:
+            payload.update(context_data)
+
+        return payload
 
     def _get_whatsapp_mimetype_kind(self):
         return {
