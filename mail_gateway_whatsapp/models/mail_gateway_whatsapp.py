@@ -7,6 +7,7 @@ import mimetypes
 import traceback
 from datetime import datetime
 from io import StringIO
+import re
 
 import requests
 import requests_toolbelt
@@ -51,10 +52,10 @@ class MailGatewayWhatsappService(models.AbstractModel):
         if (
             "sha256=%s"
             % hmac.new(
-                bot_data["webhook_secret"].encode(),
-                request.httprequest.data,
-                hashlib.sha256,
-            ).hexdigest()
+            bot_data["webhook_secret"].encode(),
+            request.httprequest.data,
+            hashlib.sha256,
+        ).hexdigest()
             != signature
         ):
             return True
@@ -201,8 +202,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         .message_post(
                             body=body,
                             author_id=author
-                            and author._name == "res.partner"
-                            and author.id,
+                                      and author._name == "res.partner"
+                                      and author.id,
                             gateway_type="whatsapp",
                             date=datetime.fromtimestamp(int(message["timestamp"])),
                             # message_id=update.message.message_id,
@@ -328,19 +329,35 @@ class MailGatewayWhatsappService(models.AbstractModel):
     def _send_payload(
         self, channel, body=False, media_id=False, media_type=False, media_name=False
     ):
+        formated_body = re.sub(r"\*.*\*", "", body).strip()
         last_message = self.env['mail.message'].search([
             ('model', '=', 'mail.channel'),
             ('res_id', '=', channel.id)
         ], order='create_date desc', limit=1)
 
+        last_message_body = str(last_message.body)
+
         context_data = {}
 
-        if last_message.parent_id:
-            context_data = {
-                "context": {
-                    "message_id": last_message.parent_id.whatsapp_id
+        if last_message_body == formated_body:
+            if last_message.parent_id:
+                context_data = {
+                    "context": {
+                        "message_id": last_message.parent_id.whatsapp_id
+                    }
                 }
-            }
+        else:
+            message_body = self.env['mail.message'].search([
+                ('model', '=', 'mail.channel'),
+                ('res_id', '=', channel.id),
+                ('body', '=', formated_body)
+            ], order='create_date desc', limit=1)
+            if message_body.parent_id:
+                context_data = {
+                    "context": {
+                        "message_id": message_body.parent_id.whatsapp_id
+                    }
+                }
 
         payload = {
             "messaging_product": "whatsapp",
