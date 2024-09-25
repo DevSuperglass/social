@@ -70,7 +70,7 @@ class GatewayController(Controller):
             context = message.get('context', {})
             if context:
                 context_id = context.get('id')
-                # reply_id = request.env['mail.message'].sudo().search([('whatsapp_id', '=', context_id)]).id
+                reply_id = request.env['mail.message'].sudo().search([('whatsapp_id', '=like', context_id)], limit=1).id
 
         numero_formatado = "+{} {} {}-{}".format(numero[:2], numero[2:4], numero[4:9], numero[9:])
         partner_name = jsonrequest['entry'][0]['changes'][0]['value']['contacts'][0]['profile']['name']
