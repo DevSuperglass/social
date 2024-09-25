@@ -70,14 +70,14 @@ class GatewayController(Controller):
             context = message.get('context', {})
             if context:
                 context_id = context.get('id')
-                reply_id = request.env['mail.message'].sudo().search([('whatsapp_id', '=like', context_id)]).id
+                reply_id = request.env['mail.message'].sudo().search([('whatsapp_id', '=', context_id)]).id
 
         numero_formatado = "+{} {} {}-{}".format(numero[:2], numero[2:4], numero[4:9], numero[9:])
         partner_name = jsonrequest['entry'][0]['changes'][0]['value']['contacts'][0]['profile']['name']
 
         button_template = messages[0].get('button', {}).get('payload', False)
 
-        partner = request.env['res.partner'].sudo().search([('mobile', '=', numero_formatado)])
+        partner = request.env['res.partner'].sudo().search([('mobile', '=', numero_formatado), ('phone', '=', numero_formatado)])
 
         if not partner:
             department_id = request.env['hr.department'].sudo().search(
@@ -132,8 +132,9 @@ class GatewayController(Controller):
         change_status = request.env['crm.lead'].sudo().search(
             [('mobile', '=', numero_formatado), ('new_status', '=', 'draft')])
 
-        change_status.new_status = 'in_progress'
-        change_status.remove_button = True
+        if change_status:
+            change_status.new_status = 'in_progress'
+            change_status.remove_button = True
 
         bot_data = request.env["mail.gateway"]._get_gateway(
             token, gateway_type=usage, state="integrated"
