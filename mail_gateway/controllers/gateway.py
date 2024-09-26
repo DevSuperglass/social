@@ -77,7 +77,7 @@ class GatewayController(Controller):
 
         button_template = messages[0].get('button', {}).get('payload', False)
 
-        partner = request.env['res.partner'].sudo().search([('mobile', '=', numero_formatado), ('phone', '=', numero_formatado)])
+        partner = request.env['res.partner'].sudo().search(['|', ('mobile', '=', numero_formatado), ('phone', '=', numero_formatado)])
 
         if not partner:
             department_id = request.env['hr.department'].sudo().search(
