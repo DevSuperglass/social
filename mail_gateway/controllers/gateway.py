@@ -8,6 +8,7 @@ from odoo.http import Controller, request, route
 from datetime import datetime, date
 import datetime
 import requests.exceptions
+import re
 
 _logger = logging.getLogger(__name__)
 
@@ -77,7 +78,20 @@ class GatewayController(Controller):
 
         button_template = messages[0].get('button', {}).get('payload', False)
 
-        partner = request.env['res.partner'].sudo().search(['|', ('mobile', '=', numero_formatado), ('phone', '=', numero_formatado)])
+        # partner = request.env['res.partner'].sudo().search(['|', ('mobile', '=', numero_formatado), ('phone', '=', numero_formatado)])
+
+        partner = request.env['res.partner']
+
+        for prtn in request.env['res.partner'].sudo().search(['|', ('mobile', '!=', False), ('phone', '!=', False)]):
+            formatted_number = ''
+
+            if prtn.mobile:
+                formatted_number = re.sub(r'[+\s-]', '', prtn.mobile)
+            elif prtn.phone:
+                formatted_number = re.sub(r'[+\s-]', '', prtn.phone)
+
+            if formatted_number == numero:
+                partner += prtn
 
         if not partner:
             department_id = request.env['hr.department'].sudo().search(
