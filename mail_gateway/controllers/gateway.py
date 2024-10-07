@@ -83,14 +83,19 @@ class GatewayController(Controller):
         partner = request.env['res.partner']
 
         for prtn in request.env['res.partner'].sudo().search(['|', ('mobile', '!=', False), ('phone', '!=', False)]):
-            formatted_number = ''
+            formatted_mobile_number = ''
+            formatted_phone_number = ''
 
             if prtn.mobile:
-                formatted_number = re.sub(r'[+\s-]', '', prtn.mobile)
-            elif prtn.phone:
-                formatted_number = re.sub(r'[+\s-]', '', prtn.phone)
+                formatted_mobile_number = re.sub(r'[+\s-]', '', prtn.mobile)
 
-            if formatted_number == numero:
+            if prtn.phone:
+                formatted_phone_number = re.sub(r'[+\s-]', '', prtn.phone)
+
+            if formatted_mobile_number == numero:
+                partner += prtn
+
+            if formatted_phone_number == numero:
                 partner += prtn
 
         if not partner:
