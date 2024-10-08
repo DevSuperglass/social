@@ -39,8 +39,8 @@ class GatewayController(Controller):
                 ._receive_get_update(bot_data, request, **kwargs)
             )
         jsonrequest = json.loads(
-                    request.httprequest.get_data().decode(request.httprequest.charset)
-                )
+            request.httprequest.get_data().decode(request.httprequest.charset)
+        )
         current_date = date.today()
 
         entry = jsonrequest.get('entry', [])
@@ -58,6 +58,9 @@ class GatewayController(Controller):
             return
 
         whats_id = messages[0].get('id')
+
+        if request.env['mail.message'].sudo().search([('whatsapp_id', '=', whats_id)]):
+            return
 
         contacts = value.get('contacts', [])
 
@@ -97,7 +100,8 @@ class GatewayController(Controller):
             department_id = request.env['hr.department'].sudo().search(
                 [('complete_name', '=', 'SUPERGLASS / VENDAS')]).id
             parent_id = request.env['category_request'].sudo().search([('name', '=', 'CADASTRO DE CELULAR')]).id
-            child_id = request.env['category_request'].sudo().search([('name', '=like', 'ATUALIZAR NÚMERO DE CELULAR')]).id
+            child_id = request.env['category_request'].sudo().search(
+                [('name', '=like', 'ATUALIZAR NÚMERO DE CELULAR')]).id
 
             vals_list = {
                 'name': partner_name,
@@ -125,23 +129,27 @@ class GatewayController(Controller):
             gerproc_create = request.env["project_request"].sudo().create(new_partner_vals)
 
         if button_template:
-            template_id = request.env['whatsapp.template'].sudo().search([('wa_ids.wa_id', 'ilike', context_id)]).id
             button_record = request.env['whatsapp.template.button'].sudo().search(
-                [('name', '=', button_template), ('whatsapp_template_id', '=', template_id)])
-            function_name = button_record.code
-            if function_name:
-                button_record.with_context(
-                    numero_formatado=numero_formatado,
-                    button=button_template,
-                    partner_name=partner_name,
-                    partner=partner,
-                    function_name=function_name,
-                    current_date=current_date,
-                    json=entry,
-                    waid=context_id
-                ).call_function()
+                [('name', '=', button_template), ('whatsapp_template_id', '=',
+                                                  request.env['whatsapp.template'].sudo().search(
+                                                      [('wa_ids.wa_id', '=like', context_id)]).id)])
+            if button_record.code:
+                model = button_record.env[button_record.model_id.model].with_context(
+                        numero_formatado=numero_formatado,
+                        button=button_template,
+                        partner_name=partner_name,
+                        partner=partner,
+                        current_date=current_date,
+                        json=entry,
+                        waid=context_id
+                    )
+                function_to_call = getattr(model, button_record.code, None)
+                if callable(function_to_call):
+                    function_to_call()
+                else:
+                    return False
             else:
-                print("Button template not found")
+                _logger.warning("Button template not found")
 
         change_status = request.env['crm.lead'].sudo().search(
             [('mobile', '=', numero_formatado), ('new_status', '=', 'draft')])
