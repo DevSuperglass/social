@@ -451,7 +451,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
         # By default, it does nothing.
         return {}
 
-    def _send_tmpl_message(self, tmpl_name, body_values, mobile, body_message):
+    def _send_tmpl_message(self, tmpl_name, paramenters, mobile, body_message):
         gateway = self.env['mail.gateway'].search([('whatsapp_from_phone', '=', '413704291825593')], limit=1)
         tmpl_id = self.env['whatsapp.template'].search([('name', '=', tmpl_name)], limit=1)
         message = self.create_message(mobile, body_message)
@@ -470,7 +470,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                              'components': [
                                  {
                                      "type": "body",
-                                     "parameters": body_values
+                                     "parameters": paramenters
                                  }
                              ]
                          }})
@@ -482,7 +482,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
         else:
             json.update({"type": 'text',
                          "text": {
-                             "body": body_values
+                             "body": paramenters
                          }})
 
         self.env['whatsapp.request'].sudo().create({
