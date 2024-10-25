@@ -260,42 +260,30 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     proxies=self._get_proxies(),
                 )
                 response.raise_for_status()
-                response = requests.post(
-                    "https://graph.facebook.com/v%s/%s/messages"
-                    % (
-                        gateway.whatsapp_version,
-                        gateway.whatsapp_from_phone,
-                    ),
-                    headers={"Authorization": "Bearer %s" % gateway.token},
-                    json=self._send_payload(
-                        record.gateway_channel_id,
-                        media_id=response.json()["id"],
-                        media_type=attachment_type,
-                        media_name=attachment.name,
-                    ),
-                    timeout=10,
-                    proxies=self._get_proxies(),
+
+                url = "https://graph.facebook.com/v%s/%s/messages" % (
+                    gateway.whatsapp_version,
+                    gateway.whatsapp_from_phone)
+                headers = {"Authorization": "Bearer %s" % gateway.token}
+                json = self._send_payload(
+                    record.gateway_channel_id,
+                    media_id=response.json()["id"],
+                    media_type=attachment_type,
+                    media_name=attachment.name,
                 )
-                response.raise_for_status()
-                message = response.json()
+                message = self._create_request_line(url=url, headers=headers, json=json, record=record)
 
             body = self._get_message_body(record)
             if body:
                 user_name = "*[{}]* ".format(self.env.user.name)
                 body = user_name + body
-                response = requests.post(
-                    "https://graph.facebook.com/v%s/%s/messages"
-                    % (
-                        gateway.whatsapp_version,
-                        gateway.whatsapp_from_phone,
-                    ),
-                    headers={"Authorization": "Bearer %s" % gateway.token},
-                    json=self._send_payload(record.gateway_channel_id, body=body),
-                    timeout=10,
-                    proxies=self._get_proxies(),
+                url = "https://graph.facebook.com/v%s/%s/messages" % (
+                    gateway.whatsapp_version,
+                    gateway.whatsapp_from_phone,
                 )
-                response.raise_for_status()
-                message = response.json()
+                headers = {"Authorization": "Bearer %s" % gateway.token}
+                json = self._send_payload(record.gateway_channel_id, body=body)
+                message = self._create_request_line(url=url, headers=headers, json=json, record=record)
         except Exception as exc:
             buff = StringIO()
             traceback.print_exc(file=buff)
@@ -319,12 +307,14 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     # "gateway_message_id": message["messages"][0]["id"],
                 }
             )
-            # Atualizar o campo whatsapp_id no modelo mail.message
-            record.mail_message_id.sudo().write({'whatsapp_id': message["messages"][0]["id"]})
 
         if auto_commit is True:
             # pylint: disable=invalid-commit
             self.env.cr.commit()
+
+    def _create_request_line(self, url, headers, json, record):
+        return self.env['whatsapp.request'].sudo().create(
+            {'url': url, 'headers': headers, 'json': json, 'mail_message_id': record.mail_message_id.id})
 
     def _send_payload(
         self, channel, body=False, media_id=False, media_type=False, media_name=False
@@ -460,3 +450,75 @@ class MailGatewayWhatsappService(models.AbstractModel):
         # This hook has been created in order to add a proxy if needed.
         # By default, it does nothing.
         return {}
+
+    def _send_tmpl_message(self, tmpl_name, body_values, mobile, body_message):
+        gateway = self.env['mail.gateway'].search([('whatsapp_from_phone', '=', '413704291825593')], limit=1)
+        tmpl_id = self.env['whatsapp.template'].search([('name', '=', tmpl_name)], limit=1)
+        message = self.create_message(mobile, body_message)
+
+        json = {
+            'messaging_product': 'whatsapp',
+            'recipient_type': 'individual',
+            'to': mobile,
+        }
+
+        if tmpl_id:
+            json.update({'type': 'template',
+                         'template': {
+                             'name': tmpl_id.template_name,
+                             'language': {'code': tmpl_id.lang_code},
+                             'components': [
+                                 {
+                                     "type": "body",
+                                     "parameters": body_values
+                                 }
+                             ]
+                         }})
+            self.env['whatsapp.template.waid'].sudo().create({
+                'whatsapp_template_id': tmpl_id.id,
+                'body': body_message,
+                'mail_message_id': message.id
+            })
+        else:
+            json.update({"type": 'text',
+                         "text": {
+                             "body": body_values
+                         }})
+
+        self.env['whatsapp.request'].sudo().create({
+            'url': f'https://graph.facebook.com/v20.0/{gateway.whatsapp_from_phone}/messages',
+            'headers': {
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {gateway.token}'
+            },
+            'json': json,
+            'mail_message_id': message.id,
+        })
+
+    def create_message(self, mobile, body_message):
+        channel = self.env['mail.channel'].search([
+            ('gateway_channel_token', '=', mobile),
+            ('channel_type', '=', 'gateway')
+        ], limit=1)
+
+        if channel:
+            message = self.env['mail.message'].create({
+                'body': body_message,
+                'message_type': 'comment',
+                'subtype_id': self.env.ref('mail.mt_comment').id,
+                'model': 'mail.channel',
+                'res_id': channel.id,
+                'author_id': self.env.user.partner_id.id,
+                'gateway_type': 'whatsapp',
+            })
+
+            self.env['mail.notification'].create({
+                'mail_message_id': message.id,
+                'notification_type': 'gateway',
+                'notification_status': 'sent',
+                'author_id': self.env.user.partner_id.id,
+                'gateway_channel_id': channel.id,
+                'gateway_type': 'whatsapp',
+            })._set_read_gateway()
+
+            return message
