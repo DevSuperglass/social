@@ -451,49 +451,51 @@ class MailGatewayWhatsappService(models.AbstractModel):
         # By default, it does nothing.
         return {}
 
-    def _send_tmpl_message(self, tmpl_name, paramenters, mobile, body_message):
-        gateway = self.env['mail.gateway'].search([('whatsapp_from_phone', '=', '413704291825593')], limit=1)
+    def _send_tmpl_message(self, gateway_phone, tmpl_name, paramenters, mobile_list, body_message):
+        gateway = self.env['mail.gateway'].search([('whatsapp_from_phone', '=', gateway_phone)], limit=1)
         tmpl_id = self.env['whatsapp.template'].search([('name', '=', tmpl_name)], limit=1)
-        message = self.create_message(mobile, body_message)
 
-        json = {
-            'messaging_product': 'whatsapp',
-            'recipient_type': 'individual',
-            'to': mobile,
-        }
+        for mobile in mobile_list:
+            message = self.create_message(mobile, body_message)
 
-        if tmpl_id:
-            json.update({'type': 'template',
-                         'template': {
-                             'name': tmpl_id.template_name,
-                             'language': {'code': tmpl_id.lang_code},
-                             'components': [
-                                 {
-                                     "type": "body",
-                                     "parameters": paramenters
-                                 }
-                             ]
-                         }})
-            self.env['whatsapp.template.waid'].sudo().create({
-                'whatsapp_template_id': tmpl_id.id,
-                'body': body_message,
-                'mail_message_id': message.id
+            json = {
+                'messaging_product': 'whatsapp',
+                'recipient_type': 'individual',
+                'to': mobile,
+            }
+
+            if tmpl_id:
+                json.update({'type': 'template',
+                             'template': {
+                                 'name': tmpl_id.template_name,
+                                 'language': {'code': tmpl_id.lang_code},
+                                 'components': [
+                                     {
+                                         "type": "body",
+                                         "parameters": paramenters
+                                     }
+                                 ]
+                             }})
+                self.env['whatsapp.template.waid'].sudo().create({
+                    'whatsapp_template_id': tmpl_id.id,
+                    'body': body_message,
+                    'mail_message_id': message.id
+                })
+            else:
+                json.update({"type": 'text',
+                             "text": {
+                                 "body": paramenters
+                             }})
+
+            self.env['whatsapp.request'].sudo().create({
+                'url': f'https://graph.facebook.com/v{gateway.whatsapp_version}/{gateway.whatsapp_from_phone}/messages',
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Bearer {gateway.token}'
+                },
+                'json': json,
+                'mail_message_id': message.id,
             })
-        else:
-            json.update({"type": 'text',
-                         "text": {
-                             "body": paramenters
-                         }})
-
-        self.env['whatsapp.request'].sudo().create({
-            'url': f'https://graph.facebook.com/v20.0/{gateway.whatsapp_from_phone}/messages',
-            'headers': {
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {gateway.token}'
-            },
-            'json': json,
-            'mail_message_id': message.id,
-        })
 
     def create_message(self, mobile, body_message):
         channel = self.env['mail.channel'].search([
