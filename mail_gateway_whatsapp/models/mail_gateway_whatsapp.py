@@ -464,7 +464,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'to': mobile,
             }
 
-            if tmpl_id and tmpl_id.header_type == 'image':
+            if tmpl_id and image:
                 image_url = image
                 response = requests.post(
                     f"https://graph.facebook.com/v{gateway.whatsapp_version}/{gateway.whatsapp_from_phone}/media",
