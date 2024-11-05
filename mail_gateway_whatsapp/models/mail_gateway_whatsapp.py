@@ -451,7 +451,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
         # By default, it does nothing.
         return {}
 
-    def _send_tmpl_message(self, gateway_phone, tmpl_name, parameters, mobile_list, body_message, image):
+    def _send_tmpl_message(self, gateway_phone, tmpl_name, parameters, mobile_list, body_message):
         gateway = self.env['mail.gateway'].search([('whatsapp_from_phone', '=', gateway_phone)], limit=1)
         tmpl_id = self.env['whatsapp.template'].search([('name', '=', tmpl_name)], limit=1)
 
@@ -464,63 +464,12 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'to': mobile,
             }
 
-            if tmpl_id and image:
-                image_url = image
-                response = requests.post(
-                    f"https://graph.facebook.com/v{gateway.whatsapp_version}/{gateway.whatsapp_from_phone}/media",
-                    headers={
-                        "Authorization": f"Bearer {gateway.token}",
-                    },
-                    files={
-                        "file": ("image.jpg", image_url, "image/jpeg"),
-                    },
-                    data={
-                        "messaging_product": "whatsapp"
-                    }
-                )
-
-                media_id = response.json().get("id")
-
-                json.update({
-                    'type': 'template',
-                    'template': {
-                        'name': tmpl_id.template_name,
-                        'language': {'code': tmpl_id.lang_code},
-                        'components': [
-                            {
-                                "type": "header",
-                                "parameters": [
-                                    {
-                                        "type": "image",
-                                        "image": {
-                                            "id": media_id
-                                        }
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "body",
-                                "parameters": parameters
-                            }
-                        ]
-                    }
-                })
-                self.env['whatsapp.template.waid'].sudo().create({
-                    'whatsapp_template_id': tmpl_id.id,
-                    'body': body_message,
-                    'mail_message_id': message.id
-                })
-            elif tmpl_id:
+            if tmpl_id:
                 json.update({'type': 'template',
                              'template': {
                                  'name': tmpl_id.template_name,
                                  'language': {'code': tmpl_id.lang_code},
-                                 'components': [
-                                     {
-                                         "type": "body",
-                                         "parameters": parameters
-                                     }
-                                 ]
+                                 'components': parameters['components']
                              }})
                 self.env['whatsapp.template.waid'].sudo().create({
                     'whatsapp_template_id': tmpl_id.id,
