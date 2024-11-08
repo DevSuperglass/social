@@ -2,10 +2,19 @@
 
 import {many, one} from "@mail/model/model_field";
 import {registerPatch} from "@mail/model/model_core";
+import { clear } from '@mail/model/model_field_command';
 
 registerPatch({
     name: "Thread",
     fields: {
+     isChannelRenamable: {
+            compute() {
+                if (!this.channel) {
+                    return clear();
+                }
+                return ['chat', 'channel', 'group', 'gateway'].includes(this.channel.channel_type);
+            },
+        },
         gateway: one("Gateway"),
         messagesAsGatewayThread: many("Message", {
             inverse: "gatewayThread",

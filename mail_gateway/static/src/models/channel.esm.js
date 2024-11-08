@@ -6,6 +6,26 @@ import {registerPatch} from "@mail/model/model_core";
 registerPatch({
     name: "Channel",
     fields: {
+      displayName: {
+            compute() {
+                if (!this.thread) {
+                    return;
+                }
+                if (this.channel_type === 'chat' && this.correspondent) {
+                    return this.custom_channel_name || this.thread.getMemberName(this.correspondent.persona);
+                }
+                if (this.channel_type === 'gateway') {
+                    return this.thread.name;
+                }
+                if (this.channel_type === 'group' && !this.thread.name) {
+                    return this.channelMembers
+                        .filter(channelMember => channelMember.persona)
+                        .map(channelMember => this.thread.getMemberName(channelMember.persona))
+                        .join(this.env._t(", "));
+                }
+                return this.thread.name;
+            },
+        },
         discussSidebarCategory: {
             compute() {
                 // On gateway channels we must set the right category
