@@ -41,122 +41,29 @@ class GatewayController(Controller):
         jsonrequest = json.loads(
             request.httprequest.get_data().decode(request.httprequest.charset)
         )
+
+        # Auxiliar variables
         current_date = date.today()
-
         entry = jsonrequest.get('entry', [])
-
         changes = entry[0].get('changes', [])
-
         value = changes[0].get('value', {})
-
         messages = value.get('messages', [])
-
         statuses = value.get('statuses', [])
-
-        if not messages and statuses:
-            _logger.debug("Received a status update, not processing further.")
-            return
-
         whats_id = messages[0].get('id')
-
-        if request.env['mail.message'].sudo().search([('whatsapp_id', '=', whats_id)]):
-            return
-
-        contacts = value.get('contacts', [])
-
-        numero = contacts[0].get('wa_id')
-
+        numero = value.get('contacts', [])[0].get('wa_id')
+        partner_name = jsonrequest['entry'][0]['changes'][0]['value']['contacts'][0]['profile']['name']
+        button_template = messages[0].get('button', {}).get('payload', False)
+        partner = request.env['res.partner']
         context_id = None
         reply_id = None
         from_webhook = True
 
-        for message in messages:
-            context = message.get('context', {})
-            if context:
-                context_id = context.get('id')
-                reply_id = request.env['mail.message'].sudo().search([('whatsapp_id', '=like', context_id)], limit=1).id
+        if request.env['mail.message'].sudo().search([('whatsapp_id', '=', whats_id)]):
+            return
 
-        numero_formatado = "+{} {} {}-{}".format(numero[:2], numero[2:4], numero[4:9], numero[9:])
-        partner_name = jsonrequest['entry'][0]['changes'][0]['value']['contacts'][0]['profile']['name']
-
-        button_template = messages[0].get('button', {}).get('payload', False)
-
-        # partner = request.env['res.partner'].sudo().search(['|', ('mobile', '=', numero_formatado), ('phone', '=', numero_formatado)])
-
-        partner = request.env['res.partner']
-
-        for prtn in request.env['res.partner'].sudo().search(['|', ('mobile', '!=', False), ('phone', '!=', False)]):
-            formatted_number = ''
-
-            if prtn.mobile:
-                formatted_number = re.sub(r'[+\s-]', '', prtn.mobile)
-            elif prtn.phone:
-                formatted_number = re.sub(r'[+\s-]', '', prtn.phone)
-
-            if formatted_number == numero:
-                partner += prtn
-
-        if not partner:
-            department_id = request.env['hr.department'].sudo().search(
-                [('complete_name', '=', 'SUPERGLASS / VENDAS')]).id
-            parent_id = request.env['category_request'].sudo().search([('name', '=', 'CADASTRO DE CELULAR')]).id
-            child_id = request.env['category_request'].sudo().search(
-                [('name', '=like', 'ATUALIZAR NÚMERO DE CELULAR')]).id
-
-            vals_list = {
-                'name': partner_name,
-                'mobile': numero_formatado,
-            }
-            request.env['res.partner'].sudo().create(vals_list)
-            partner = request.env['res.partner'].sudo().search([('mobile', '=', numero_formatado)])
-
-            new_partner_vals = {
-                'status': 'aberto',
-                'private_message': 'public',
-                'department_id': department_id,
-                'user_requested_id': False,
-                'category_parent_request_id': parent_id,
-                'category_child_request': child_id,
-                'boolean_client': True,
-                'description_problem': f'Novo contato {partner_name} com celular {numero_formatado} criado, entrar em contato para o completar o cadastro.',
-                'message_follower_ids': [],
-                'activity_ids': [],
-                'message_ids': [],
-                'request_client_ids': partner.ids,
-                'update_date': current_date,
-                'opening_date': current_date
-            }
-            gerproc_create = request.env["project_request"].sudo().create(new_partner_vals)
-
-        if button_template:
-            button_record = request.env['whatsapp.template.button'].sudo().search(
-                [('name', '=', button_template), ('whatsapp_template_id', '=',
-                                                  request.env['whatsapp.template'].sudo().search(
-                                                      [('wa_ids.wa_id', '=like', context_id)]).id)])
-            if button_record.code:
-                model = button_record.env[button_record.model_id.model].with_context(
-                        numero_formatado=numero_formatado,
-                        button=button_template,
-                        partner_name=partner_name,
-                        partner=partner,
-                        current_date=current_date,
-                        json=entry,
-                        waid=context_id
-                    )
-                function_to_call = getattr(model, button_record.code, None)
-                if callable(function_to_call):
-                    function_to_call()
-                else:
-                    return False
-            else:
-                _logger.warning("Button template not found")
-
-        change_status = request.env['crm.lead'].sudo().search(
-            [('mobile', '=', numero_formatado), ('new_status', '=', 'draft')])
-
-        if change_status:
-            change_status.new_status = 'in_progress'
-            change_status.remove_button = True
+        if not messages and statuses:
+            _logger.debug("Received a status update, not processing further.")
+            return
 
         bot_data = request.env["mail.gateway"]._get_gateway(
             token, gateway_type=usage, state="integrated"
@@ -199,8 +106,54 @@ class GatewayController(Controller):
             usage,
             json.dumps(jsonrequest),
         )
+
+        if not request.env['res.partner'].sudo().search([('phone_sanitized', '=', "+" + numero)]):
+            vals_list = {
+                'name': partner_name,
+            }
+
+            vals_list.update({'phone': numero, 'whatsapp_contact': 'phone'}) if len(numero) == 12 else vals_list.update(
+                {'mobile': numero, 'whatsapp_contact': 'mobile'})
+            partner = request.env['res.partner'].sudo().create(vals_list)
+
+        for message in messages:
+            context = message.get('context', {})
+            if context:
+                context_id = context.get('id')
+                reply_id = request.env['mail.message'].sudo().search([('whatsapp_id', '=like', context_id)], limit=1).id
+
         gateway = dispatcher.env["mail.gateway"].browse(bot_data["id"])
         dispatcher._receive_update(gateway, jsonrequest, whats_id, reply_id, from_webhook)
+
+        change_status = request.env['crm.lead'].sudo().search(
+            [('mobile', '=', numero), ('new_status', '=', 'draft')])
+
+        if change_status:
+            change_status.new_status = 'in_progress'
+            change_status.remove_button = True
+
+        if button_template:
+            button_record = request.env['whatsapp.template.button'].sudo().search(
+                [('name', '=', button_template), ('whatsapp_template_id', '=',
+                                                  request.env['whatsapp.template'].sudo().search(
+                                                      [('wa_ids.wa_id', '=like', context_id)]).id)])
+            if button_record.code:
+                model = button_record.env[button_record.model_id.model].with_context(
+                    numero_formatado=numero,
+                    button=button_template,
+                    partner_name=partner_name,
+                    partner=partner,
+                    current_date=current_date,
+                    json=entry,
+                    waid=context_id
+                )
+                function_to_call = getattr(model, button_record.code, None)
+                if callable(function_to_call):
+                    function_to_call()
+                else:
+                    return False
+            else:
+                _logger.warning("Button template not found")
 
         return request.make_response(
             json.dumps({}),
