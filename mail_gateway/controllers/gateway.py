@@ -49,16 +49,17 @@ class GatewayController(Controller):
         value = changes[0].get('value', {})
         messages = value.get('messages', [])
         statuses = value.get('statuses', [])
+
+        if not messages and statuses:
+            _logger.debug("Received a status update, not processing further.")
+            return
+
         partner_name = jsonrequest['entry'][0]['changes'][0]['value']['contacts'][0]['profile']['name']
         button_template = messages[0].get('button', {}).get('payload', False)
         partner = request.env['res.partner']
         context_id = None
         reply_id = None
         from_webhook = True
-
-        if not messages and statuses:
-            _logger.debug("Received a status update, not processing further.")
-            return
 
         whats_id = messages[0].get('id')
         numero = value.get('contacts', [])[0].get('wa_id')
