@@ -457,6 +457,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
         for mobile in mobile_list:
             message = self.create_message(mobile, body_message)
+            if not message:
+                raise UserError(f'O número de telefone {mobile} não é válido. Para realizar o envio, utilize o seguinte formato: 55DDD(9)Telefone. Exemplo: 5511912345678.')
 
             json = {
                 'messaging_product': 'whatsapp',
@@ -508,6 +510,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'author_id': self.env.user.partner_id.id,
                 'gateway_type': 'whatsapp',
             })
+            self.env['mail.channel'].link_message_post(channel,message)
 
             self.env['mail.notification'].create({
                 'mail_message_id': message.id,
