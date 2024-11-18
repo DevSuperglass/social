@@ -509,37 +509,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'gateway_type': 'whatsapp',
             })
             match = re.search(r"Cotação Nº: (\d+)", body_message)
-            quotation = self.env['quotation'].browse(int(match.group(1)))
-            service_init = channel.message_ids.filtered(lambda lm: lm.gateway_thread_data).sorted('id', reverse=True)
-            service_end = channel.message_ids.filtered(lambda lm: lm.close_service).sorted('id', reverse=True)
-            service_init = service_init[0] if service_init else service_init
-            service_end = service_end[0].id if service_end else 0
-            if service_init:
-                if service_end < service_init.id:
-                    if not message.gateway_thread_data:
-                        message.gateway_thread_data = service_init.gateway_thread_data
-                    new_message = quotation.message_post(
-                        body=message.body,
-                        author_id=message.author_id.id,
-                        gateway_type=message.gateway_type,
-                        date=message.date,
-                        # message_id=update.message.message_id,
-                        subtype_xmlid="mail.mt_comment",
-                        message_type="comment",
-                        attachment_ids=message.attachment_ids.ids,
-                        gateway_notifications=[],  # Avoid sending notifications
-                        email_from=self.env.user.partner_id.email
-                    )
-                    self.env['mail.channel'].browse(message.res_id).quotation_created = True
-                    message.gateway_message_id = new_message
-                    self.env["bus.bus"]._sendone(
-                        self.env.user.partner_id,
-                        "mail.message/insert",
-                        {
-                            "id": message.id,
-                            "gateway_thread_data": message.sudo().gateway_thread_data,
-                        },
-                    )
+            # quotation = self.env['quotation'].browse(int(match.group(1)))
+            self.env['mail.channel'].link_message_post(channel,message)
 
             self.env['mail.notification'].create({
                 'mail_message_id': message.id,
