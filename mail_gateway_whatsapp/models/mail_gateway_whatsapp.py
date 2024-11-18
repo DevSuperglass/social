@@ -508,8 +508,6 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'author_id': self.env.user.partner_id.id,
                 'gateway_type': 'whatsapp',
             })
-            match = re.search(r"Cotação Nº: (\d+)", body_message)
-            # quotation = self.env['quotation'].browse(int(match.group(1)))
             self.env['mail.channel'].link_message_post(channel,message)
 
             self.env['mail.notification'].create({
