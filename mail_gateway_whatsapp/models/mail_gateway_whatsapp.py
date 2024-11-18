@@ -451,12 +451,12 @@ class MailGatewayWhatsappService(models.AbstractModel):
         # By default, it does nothing.
         return {}
 
-    def _send_tmpl_message(self, gateway_phone, tmpl_name, components, mobile_list, body_message):
+    def _send_tmpl_message(self, gateway_phone, tmpl_name, components, mobile_list, body_message, image_id):
         gateway = self.env['mail.gateway'].search([('whatsapp_from_phone', '=', gateway_phone)], limit=1)
         tmpl_id = self.env['whatsapp.template'].search([('name', '=', tmpl_name)], limit=1)
 
         for mobile in mobile_list:
-            message = self.create_message(mobile, body_message)
+            message = self.create_message(mobile, body_message, image_id)
 
             json = {
                 'messaging_product': 'whatsapp',
@@ -492,7 +492,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'mail_message_id': message.id,
             })
 
-    def create_message(self, mobile, body_message):
+    def create_message(self, mobile, body_message,image_id):
         channel = self.env['mail.channel'].search([
             ('gateway_channel_token', '=', mobile),
             ('channel_type', '=', 'gateway')
@@ -507,6 +507,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'res_id': channel.id,
                 'author_id': self.env.user.partner_id.id,
                 'gateway_type': 'whatsapp',
+                'attachment_ids': [(6, 0, image_id.ids)],
             })
             self.env['mail.channel'].link_message_post(channel,message)
 
