@@ -49,8 +49,11 @@ class GatewayController(Controller):
         value = changes[0].get('value', {})
         messages = value.get('messages', [])
         statuses = value.get('statuses', [])
-        whats_id = messages[0].get('id')
-        numero = value.get('contacts', [])[0].get('wa_id')
+
+        if not messages and statuses:
+            _logger.debug("Received a status update, not processing further.")
+            return
+
         partner_name = jsonrequest['entry'][0]['changes'][0]['value']['contacts'][0]['profile']['name']
         button_template = messages[0].get('button', {}).get('payload', False)
         partner = request.env['res.partner']
@@ -58,11 +61,10 @@ class GatewayController(Controller):
         reply_id = None
         from_webhook = True
 
-        if request.env['mail.message'].sudo().search([('whatsapp_id', '=', whats_id)]):
-            return
+        whats_id = messages[0].get('id')
+        numero = value.get('contacts', [])[0].get('wa_id')
 
-        if not messages and statuses:
-            _logger.debug("Received a status update, not processing further.")
+        if request.env['mail.message'].sudo().search([('whatsapp_id', '=', whats_id)]):
             return
 
         bot_data = request.env["mail.gateway"]._get_gateway(
