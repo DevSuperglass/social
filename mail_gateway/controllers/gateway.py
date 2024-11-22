@@ -124,8 +124,23 @@ class GatewayController(Controller):
                 context_id = context.get('id')
                 reply_id = request.env['mail.message'].sudo().search([('whatsapp_id', '=like', context_id)], limit=1).id
 
+        # LOGS
+        _logger.info("ANTES DO RECEIVE UPDATE: {}".format(partner_name))
+        _logger.info("CONTATO EMISSOR: {}".format(partner_name))
+        _logger.info("MENSAGEM QUE CHEGOU: {}".format(messages[0]['text']['body']))
+        _logger.info("WHATS_ID DA MENSAGEM: {}".format(whats_id))
+        _logger.info("PARENT_ID DA MENSAGEM: {}".format(context_id))
+        _logger.info("MENSAGEM PAI DENTRO DO ODOO: {}".format(reply_id))
+
         gateway = dispatcher.env["mail.gateway"].browse(bot_data["id"])
         dispatcher._receive_update(gateway, jsonrequest, whats_id, reply_id, from_webhook)
+
+        # LOGS
+        _logger.info("--------------------------")
+        _logger.info("APÓS O RECEIVE UPDATE: {}".format(whats_id))
+        _logger.info("WHATS_ID DA MENSAGEM: {}".format(whats_id))
+        _logger.info("PARENT_ID DA MENSAGEM: {}".format(context_id))
+        _logger.info("MENSAGEM PAI DENTRO DO ODOO: {}".format(reply_id))
 
         change_status = request.env['crm.lead'].sudo().search(
             [('mobile', '=', numero), ('new_status', '=', 'draft')])
@@ -156,6 +171,13 @@ class GatewayController(Controller):
                     return False
             else:
                 _logger.warning("Button template not found")
+
+        # LOGS
+        _logger.info("--------------------------")
+        _logger.info("APÓS O RECEIVE UPDATE E CHAMADA DE BOTÃO: {}".format(whats_id))
+        _logger.info("WHATS_ID DA MENSAGEM: {}".format(whats_id))
+        _logger.info("PARENT_ID DA MENSAGEM: {}".format(context_id))
+        _logger.info("MENSAGEM PAI DENTRO DO ODOO: {}".format(reply_id))
 
         return request.make_response(
             json.dumps({}),
