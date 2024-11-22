@@ -125,7 +125,7 @@ class GatewayController(Controller):
                 reply_id = request.env['mail.message'].sudo().search([('whatsapp_id', '=like', context_id)], limit=1).id
 
         # LOGS
-        _logger.info("ANTES DO RECEIVE UPDATE: {}".format(partner_name))
+        _logger.info("ANTES DO RECEIVE UPDATE")
         _logger.info("CONTATO EMISSOR: {}".format(partner_name))
         _logger.info("MENSAGEM QUE CHEGOU: {}".format(messages[0]['text']['body']))
         _logger.info("WHATS_ID DA MENSAGEM: {}".format(whats_id))
@@ -137,7 +137,7 @@ class GatewayController(Controller):
 
         # LOGS
         _logger.info("--------------------------")
-        _logger.info("APÓS O RECEIVE UPDATE: {}".format(whats_id))
+        _logger.info("APÓS O RECEIVE UPDATE")
         _logger.info("WHATS_ID DA MENSAGEM: {}".format(whats_id))
         _logger.info("PARENT_ID DA MENSAGEM: {}".format(context_id))
         _logger.info("MENSAGEM PAI DENTRO DO ODOO: {}".format(reply_id))
@@ -174,7 +174,7 @@ class GatewayController(Controller):
 
         # LOGS
         _logger.info("--------------------------")
-        _logger.info("APÓS O RECEIVE UPDATE E CHAMADA DE BOTÃO: {}".format(whats_id))
+        _logger.info("APÓS O RECEIVE UPDATE E CHAMADA DE BOTÃO")
         _logger.info("WHATS_ID DA MENSAGEM: {}".format(whats_id))
         _logger.info("PARENT_ID DA MENSAGEM: {}".format(context_id))
         _logger.info("MENSAGEM PAI DENTRO DO ODOO: {}".format(reply_id))
