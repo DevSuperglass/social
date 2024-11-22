@@ -49,8 +49,11 @@ class GatewayController(Controller):
         value = changes[0].get('value', {})
         messages = value.get('messages', [])
         statuses = value.get('statuses', [])
-        whats_id = messages[0].get('id')
-        numero = value.get('contacts', [])[0].get('wa_id')
+
+        if not messages and statuses:
+            _logger.debug("Received a status update, not processing further.")
+            return
+
         partner_name = jsonrequest['entry'][0]['changes'][0]['value']['contacts'][0]['profile']['name']
         button_template = messages[0].get('button', {}).get('payload', False)
         partner = request.env['res.partner']
@@ -58,11 +61,10 @@ class GatewayController(Controller):
         reply_id = None
         from_webhook = True
 
-        if request.env['mail.message'].sudo().search([('whatsapp_id', '=', whats_id)]):
-            return
+        whats_id = messages[0].get('id')
+        numero = value.get('contacts', [])[0].get('wa_id')
 
-        if not messages and statuses:
-            _logger.debug("Received a status update, not processing further.")
+        if request.env['mail.message'].sudo().search([('whatsapp_id', '=', whats_id)]):
             return
 
         bot_data = request.env["mail.gateway"]._get_gateway(
@@ -122,8 +124,23 @@ class GatewayController(Controller):
                 context_id = context.get('id')
                 reply_id = request.env['mail.message'].sudo().search([('whatsapp_id', '=like', context_id)], limit=1).id
 
+        # LOGS
+        _logger.info("ANTES DO RECEIVE UPDATE: {}".format(partner_name))
+        _logger.info("CONTATO EMISSOR: {}".format(partner_name))
+        _logger.info("MENSAGEM QUE CHEGOU: {}".format(messages[0]['text']['body']))
+        _logger.info("WHATS_ID DA MENSAGEM: {}".format(whats_id))
+        _logger.info("PARENT_ID DA MENSAGEM: {}".format(context_id))
+        _logger.info("MENSAGEM PAI DENTRO DO ODOO: {}".format(reply_id))
+
         gateway = dispatcher.env["mail.gateway"].browse(bot_data["id"])
         dispatcher._receive_update(gateway, jsonrequest, whats_id, reply_id, from_webhook)
+
+        # LOGS
+        _logger.info("--------------------------")
+        _logger.info("APÓS O RECEIVE UPDATE: {}".format(whats_id))
+        _logger.info("WHATS_ID DA MENSAGEM: {}".format(whats_id))
+        _logger.info("PARENT_ID DA MENSAGEM: {}".format(context_id))
+        _logger.info("MENSAGEM PAI DENTRO DO ODOO: {}".format(reply_id))
 
         change_status = request.env['crm.lead'].sudo().search(
             [('mobile', '=', numero), ('new_status', '=', 'draft')])
@@ -154,6 +171,13 @@ class GatewayController(Controller):
                     return False
             else:
                 _logger.warning("Button template not found")
+
+        # LOGS
+        _logger.info("--------------------------")
+        _logger.info("APÓS O RECEIVE UPDATE E CHAMADA DE BOTÃO: {}".format(whats_id))
+        _logger.info("WHATS_ID DA MENSAGEM: {}".format(whats_id))
+        _logger.info("PARENT_ID DA MENSAGEM: {}".format(context_id))
+        _logger.info("MENSAGEM PAI DENTRO DO ODOO: {}".format(reply_id))
 
         return request.make_response(
             json.dumps({}),
