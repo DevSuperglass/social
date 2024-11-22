@@ -127,7 +127,8 @@ class GatewayController(Controller):
         # LOGS
         _logger.info("ANTES DO RECEIVE UPDATE")
         _logger.info("CONTATO EMISSOR: {}".format(partner_name))
-        _logger.info("MENSAGEM QUE CHEGOU: {}".format(messages[0]['text']['body']))
+        _logger.info("MENSAGEM QUE CHEGOU: {}".format(
+            messages[0]['text']['body'] if not button_template else button_template))
         _logger.info("WHATS_ID DA MENSAGEM: {}".format(whats_id))
         _logger.info("PARENT_ID DA MENSAGEM: {}".format(context_id))
         _logger.info("MENSAGEM PAI DENTRO DO ODOO: {}".format(reply_id))
