@@ -140,6 +140,14 @@ class GatewayController(Controller):
         gateway = dispatcher.env["mail.gateway"].browse(bot_data["id"])
         dispatcher._receive_update(gateway, jsonrequest, whats_id, reply_id, from_webhook)
 
+        try:
+            response = requests.post(f'https://homologation.ddns.net/gateway/whatsapp/homologacao/update',
+                                     json=jsonrequest, headers=request.httprequest.headers)
+            response.raise_for_status()
+        except Exception:
+            _logger.info("exception")
+            pass
+
         # LOGS
         _logger.info("--------------------------")
         _logger.info("APÓS O RECEIVE UPDATE")
