@@ -120,10 +120,10 @@ class GatewayController(Controller):
                 context_id = context.get('id')
                 reply_id = request.env['mail.message'].sudo().search([('whatsapp_id', '=like', context_id)], limit=1).id
 
-        if messages[0]['type'] == 'text':
-            message = messages[0]['text']['body']
-        else:
-            message = button_template
+        # if messages[0]['type'] == 'text':
+        #     message = messages[0]['text']['body']
+        # else:
+        #     message = button_template
 
         # LOGS
         # _logger.info("ANTES DO RECEIVE UPDATE")
