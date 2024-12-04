@@ -3,12 +3,8 @@
 
 import logging
 import json
-import random
 from odoo.http import Controller, request, route
-from datetime import datetime, date
-import datetime
-import requests.exceptions
-import re
+from datetime import date
 
 _logger = logging.getLogger(__name__)
 
