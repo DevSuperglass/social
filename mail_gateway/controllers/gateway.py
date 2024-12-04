@@ -130,30 +130,22 @@ class GatewayController(Controller):
             message = button_template
 
         # LOGS
-        _logger.info("ANTES DO RECEIVE UPDATE")
-        _logger.info("CONTATO EMISSOR: {}".format(partner_name))
-        _logger.info("MENSAGEM QUE CHEGOU: {}".format(message))
-        _logger.info("WHATS_ID DA MENSAGEM: {}".format(whats_id))
-        _logger.info("PARENT_ID DA MENSAGEM: {}".format(context_id))
-        _logger.info("MENSAGEM PAI DENTRO DO ODOO: {}".format(reply_id))
+        # _logger.info("ANTES DO RECEIVE UPDATE")
+        # _logger.info("CONTATO EMISSOR: {}".format(partner_name))
+        # _logger.info("MENSAGEM QUE CHEGOU: {}".format(message))
+        # _logger.info("WHATS_ID DA MENSAGEM: {}".format(whats_id))
+        # _logger.info("PARENT_ID DA MENSAGEM: {}".format(context_id))
+        # _logger.info("MENSAGEM PAI DENTRO DO ODOO: {}".format(reply_id))
 
         gateway = dispatcher.env["mail.gateway"].browse(bot_data["id"])
         dispatcher._receive_update(gateway, jsonrequest, whats_id, reply_id, from_webhook)
 
-        try:
-            response = requests.post(f'https://homologation.ddns.net/gateway/whatsapp/homologacao/update',
-                                     json=jsonrequest, headers=request.httprequest.headers)
-            response.raise_for_status()
-        except Exception:
-            _logger.info("exception")
-            pass
-
         # LOGS
-        _logger.info("--------------------------")
-        _logger.info("APÓS O RECEIVE UPDATE")
-        _logger.info("WHATS_ID DA MENSAGEM: {}".format(whats_id))
-        _logger.info("PARENT_ID DA MENSAGEM: {}".format(context_id))
-        _logger.info("MENSAGEM PAI DENTRO DO ODOO: {}".format(reply_id))
+        # _logger.info("--------------------------")
+        # _logger.info("APÓS O RECEIVE UPDATE")
+        # _logger.info("WHATS_ID DA MENSAGEM: {}".format(whats_id))
+        # _logger.info("PARENT_ID DA MENSAGEM: {}".format(context_id))
+        # _logger.info("MENSAGEM PAI DENTRO DO ODOO: {}".format(reply_id))
 
         change_status = request.env['crm.lead'].sudo().search(
             [('mobile', '=', numero), ('new_status', '=', 'draft')])
@@ -186,11 +178,11 @@ class GatewayController(Controller):
                 _logger.warning("Button template not found")
 
         # LOGS
-        _logger.info("--------------------------")
-        _logger.info("APÓS O RECEIVE UPDATE E CHAMADA DE BOTÃO")
-        _logger.info("WHATS_ID DA MENSAGEM: {}".format(whats_id))
-        _logger.info("PARENT_ID DA MENSAGEM: {}".format(context_id))
-        _logger.info("MENSAGEM PAI DENTRO DO ODOO: {}".format(reply_id))
+        # _logger.info("--------------------------")
+        # _logger.info("APÓS O RECEIVE UPDATE E CHAMADA DE BOTÃO")
+        # _logger.info("WHATS_ID DA MENSAGEM: {}".format(whats_id))
+        # _logger.info("PARENT_ID DA MENSAGEM: {}".format(context_id))
+        # _logger.info("MENSAGEM PAI DENTRO DO ODOO: {}".format(reply_id))
 
         return request.make_response(
             json.dumps({}),
