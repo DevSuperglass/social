@@ -507,7 +507,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'subtype_id': self.env.ref('mail.mt_comment').id,
                 'model': 'mail.channel',
                 'res_id': channel.id,
-                'author_id': self.env.user.partner_id.id,
+                'author_id': 2,
                 'gateway_type': 'whatsapp',
             })
             self.env['mail.channel'].link_message_post(channel,message)
