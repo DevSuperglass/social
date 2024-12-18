@@ -511,7 +511,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'gateway_type': 'whatsapp',
             })
             self.env['mail.channel'].link_message_post(channel,message)
-
+            channel._notify_thread(message,msg_vals=False, kwargs={})
             self.env['mail.notification'].create({
                 'mail_message_id': message.id,
                 'notification_type': 'gateway',
