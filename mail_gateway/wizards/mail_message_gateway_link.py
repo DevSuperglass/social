@@ -30,6 +30,7 @@ class MailMessageGatewayLink(models.TransientModel):
             message_type="comment",
             attachment_ids=self.message_id.attachment_ids.ids,
             gateway_notifications=[],  # Avoid sending notifications
+            email_from=self.env.user.partner_id.email,
         )
         self.message_id.gateway_message_id = new_message
         self.env["bus.bus"]._sendone(
