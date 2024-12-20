@@ -493,7 +493,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'json': json,
                 'mail_message_id': message.id,
             })
-
+        return message
     def create_message(self, mobile, body_message):
         channel = self.env['mail.channel'].search([
             ('gateway_channel_token', '=', mobile),
