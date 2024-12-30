@@ -19,8 +19,6 @@ from odoo.tools import html2plaintext
 
 from odoo.addons.base.models.ir_mail_server import MailDeliveryException
 
-# PROPRIETÁRIO
-import base64
 from io import BytesIO
 from pydub import AudioSegment
 
@@ -69,7 +67,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 continue
         return result
 
-    def _receive_update(self, gateway, update, whats_id, reply_id, from_webhook):
+    def _receive_update(self, gateway, update):
         if update:
             for entry in update["entry"]:
                 for change in entry["changes"]:
@@ -81,13 +79,63 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         )
                         if not chat:
                             continue
-                        message_type = message.get("type")
-                        if message_type == "button":
-                            button_payload = message.get("button", {}).get("payload")
-                            if button_payload:
-                                text_from_payload = button_payload
-                                message['payload_text'] = text_from_payload
-                        self._process_update(chat, message, change["value"], whats_id, reply_id, from_webhook)
+                        message_id = self._process_update(chat, message, change["value"])
+                        self._set_queue(chat, message_id)
+                        self._get_crm_meta(message.get("from"))
+                        if message.get("type") != "button":
+                            continue
+                        self._process_button(message.get("button", {}).get("payload"), message, update)
+
+    def _get_crm_meta(self, number):
+        change_status = self.env['crm.lead'].sudo().search(
+            [('mobile', '=', number), ('new_status', '=', 'draft')])
+
+        if change_status:
+            change_status.new_status = 'in_progress'
+            change_status.remove_button = True
+
+    def _process_button(self, button_template, message, update):
+        parent_id = self._get_parent_message(message)
+        if button_template:
+            button_record = request.env['whatsapp.template.button'].sudo().search(
+                [('name', '=', button_template), ('whatsapp_template_id', '=',
+                                                  request.env['whatsapp.template'].sudo().search(
+                                                      [('wa_ids.wa_id', '=like', parent_id)]).id)])
+            if button_record.code:
+                model = button_record.env[button_record.model_id.model].with_context(
+                    json=update,
+                )
+                function_to_call = getattr(model, button_record.code, None)
+                if callable(function_to_call):
+                    function_to_call()
+                else:
+                    return False
+            else:
+                _logger.warning("Button template not found")
+
+    def _set_queue(self, channel_id, message_id):
+        """
+            Reserva do atendimento para que seja ordenado de forma correta.
+        """
+        if not channel_id.queue_id:
+            partner_id = self.env['res.partner.gateway.channel'].search(
+                [('gateway_token', '=', channel_id.gateway_channel_token)]).partner_id
+            channel_id.write({'queue_id': self.env['quotation.queue'].sudo().create(
+                {'channel_id': channel_id.id,
+                 'partner_id': partner_id.id,
+                 'start_message_id': message_id.id}).id,
+                              'queue_priority': int(partner_id.priority_rating)})
+            self._send_attendance_start(mobile=channel_id.gateway_channel_token)
+
+    def _send_attendance_start(self, mobile):
+        self.env['mail.gateway.whatsapp']._send_tmpl_message(tmpl_name=None,
+                                                             gateway_phone=self.env[
+                                                                 'res.config.settings'].sudo().search(
+                                                                 []).verify_if_test_environment(),
+                                                             components="Seu atendimento será iniciado em breve",
+                                                             mobile_list=[mobile],
+                                                             body_message="Seu atendimento será iniciado em breve"
+                                                             )
 
     @staticmethod
     def convert_audio(content):
@@ -100,7 +148,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
         return converted_content
 
-    def _process_update(self, chat, message, value, whats_id, reply_id, from_webhook):
+    def _process_update(self, chat, message, value):
         chat.ensure_one()
         body = ""
         attachments = []
@@ -178,45 +226,11 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 subtype_xmlid="mail.mt_comment",
                 message_type="comment",
                 attachments=attachments,
-                parent_id=reply_id,
-                whatsapp_id=whats_id,
-                from_webhook=from_webhook
+                parent_id=self._get_parent_message(message),
+                whatsapp_id=message.get("id")
             )
             self._post_process_message(new_message, chat)
-            related_message_id = message.get("context", {}).get("id", False)
-            if related_message_id:
-                related_message = (
-                    self.env["mail.notification"]
-                    .search(
-                        [
-                            ("gateway_channel_id", "=", chat.id),
-                            ("gateway_message_id", "=", related_message_id),
-                        ]
-                    )
-                    .mail_message_id
-                )
-                if related_message and related_message.gateway_message_id:
-                    new_related_message = (
-                        self.env[related_message.gateway_message_id.model]
-                        .browse(related_message.gateway_message_id.res_id)
-                        .message_post(
-                            body=body,
-                            author_id=author
-                                      and author._name == "res.partner"
-                                      and author.id,
-                            gateway_type="whatsapp",
-                            date=datetime.fromtimestamp(int(message["timestamp"])),
-                            # message_id=update.message.message_id,
-                            subtype_xmlid="mail.mt_comment",
-                            message_type="comment",
-                            attachments=attachments,
-                            parent_id=reply_id,
-                            whatsapp_id=whats_id,
-                            from_webhook=from_webhook
-                        )
-                    )
-                    self._post_process_reply(related_message)
-                    new_message.gateway_message_id = new_related_message
+            return new_message
 
     def _send(
         self,
@@ -410,9 +424,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             )
             if gateway_partner:
                 return gateway_partner.partner_id
-            partner = self.env["res.partner"].search(
-                [("phone_sanitized", "=", "+" + str(author_id))], limit=1
-            )
+            partner = self._get_partner(update)
             if partner:
                 self.env["res.partner.gateway.channel"].create(
                     {
@@ -437,6 +449,17 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
         return False
 
+    def _get_partner(self, update):
+        number = update.get("messages")[0].get("from")
+        if not request.env['res.partner'].sudo().search([('phone_sanitized', '=', "+" + number)]):
+            vals_list = {
+                'name': update['entry'][0]['changes'][0]['value']['contacts'][0]['profile']['name'],
+            }
+
+            vals_list.update({'phone': number, 'whatsapp_contact': 'phone'}) if len(number) == 12 else vals_list.update(
+                {'mobile': number, 'whatsapp_contact': 'mobile'})
+            return request.env['res.partner'].sudo().create(vals_list)
+
     def _get_author_vals(self, gateway, author_id, update):
         for contact in update.get("contacts", []):
             if contact["wa_id"] == author_id:
@@ -458,7 +481,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
         for mobile in mobile_list:
             message = self.create_message(mobile, body_message)
             if not message:
-                raise UserError(f'O número de telefone {mobile} não é válido. Para realizar o envio, utilize o seguinte formato: 55DDD(9)Telefone. Exemplo: 5511912345678.')
+                raise UserError(
+                    f'O número de telefone {mobile} não é válido. Para realizar o envio, utilize o seguinte formato: 55DDD(9)Telefone. Exemplo: 5511912345678.')
 
             json = {
                 'messaging_product': 'whatsapp',
@@ -494,6 +518,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'mail_message_id': message.id,
             })
         return message
+
     def create_message(self, mobile, body_message):
         channel = self.env['mail.channel'].search([
             ('gateway_channel_token', '=', mobile),
@@ -510,8 +535,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'author_id': 2,
                 'gateway_type': 'whatsapp',
             })
-            self.env['mail.channel'].link_message_post(channel,message)
-            channel._notify_thread(message,msg_vals=False, kwargs={})
+            self.env['mail.channel'].link_message_post(channel, message)
+            channel._notify_thread(message, msg_vals=False, kwargs={})
             self.env['mail.notification'].create({
                 'mail_message_id': message.id,
                 'notification_type': 'gateway',
