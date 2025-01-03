@@ -528,10 +528,12 @@ class MailGatewayWhatsappService(models.AbstractModel):
         if channel:
             message = channel.with_context({'is_template': True}).message_post(
                 body=body_message,
-                author_id=2 if self.env.context.get('internal') else self.env.uid,
+                author_id=2 if self.env.context.get('internal') else self.env['res.partner'].search(
+                    [('user_id', '=', self.env.uid)]).id,
                 message_type="comment",
                 subtype_xmlid="mail.mt_comment",
                 gateway_type="whatsapp",
+                is_current_user_or_guest_author=True,
                 date=datetime.today(),
             )
             return message
