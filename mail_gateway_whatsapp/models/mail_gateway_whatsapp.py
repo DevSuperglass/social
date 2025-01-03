@@ -128,14 +128,14 @@ class MailGatewayWhatsappService(models.AbstractModel):
             self._send_attendance_start(mobile=channel_id.gateway_channel_token)
 
     def _send_attendance_start(self, mobile):
-        self.env['mail.gateway.whatsapp']._send_tmpl_message(tmpl_name=None,
-                                                             gateway_phone=self.env[
-                                                                 'res.config.settings'].sudo().search(
-                                                                 []).verify_if_test_environment(),
-                                                             components="Seu atendimento será iniciado em breve",
-                                                             mobile_list=[mobile],
-                                                             body_message="Seu atendimento será iniciado em breve"
-                                                             )
+        self.env['mail.gateway.whatsapp'].with_context({'internal': True})._send_tmpl_message(tmpl_name=None,
+                                                                                              gateway_phone=self.env[
+                                                                                                  'res.config.settings'].sudo().search(
+                                                                                                  []).verify_if_test_environment(),
+                                                                                              components="Seu atendimento será iniciado em breve",
+                                                                                              mobile_list=[mobile],
+                                                                                              body_message="Seu atendimento será iniciado em breve"
+                                                                                              )
 
     @staticmethod
     def convert_audio(content):
@@ -526,24 +526,12 @@ class MailGatewayWhatsappService(models.AbstractModel):
         ], limit=1)
 
         if channel:
-            message = self.env['mail.message'].create({
-                'body': body_message,
-                'message_type': 'comment',
-                'subtype_id': self.env.ref('mail.mt_comment').id,
-                'model': 'mail.channel',
-                'res_id': channel.id,
-                'author_id': 2,
-                'gateway_type': 'whatsapp',
-            })
-            self.env['mail.channel'].link_message_post(channel, message)
-            channel._notify_thread(message, msg_vals=False, kwargs={})
-            self.env['mail.notification'].create({
-                'mail_message_id': message.id,
-                'notification_type': 'gateway',
-                'notification_status': 'sent',
-                'author_id': self.env.user.partner_id.id,
-                'gateway_channel_id': channel.id,
-                'gateway_type': 'whatsapp',
-            })._set_read_gateway()
-
+            message = channel.with_context({'is_template': True}).message_post(
+                body=body_message,
+                author_id=2 if self.env.context.get('internal') else self.env.uid,
+                message_type="comment",
+                subtype_xmlid="mail.mt_comment",
+                gateway_type="whatsapp",
+                date=datetime.today(),
+            )
             return message
