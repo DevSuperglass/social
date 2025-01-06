@@ -5,7 +5,7 @@ import hmac
 import logging
 import mimetypes
 import traceback
-from datetime import datetime
+from datetime import datetime, date
 from io import StringIO
 import re
 
@@ -84,7 +84,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         self._get_crm_meta(message.get("from"))
                         if message.get("type") != "button":
                             continue
-                        self._process_button(message.get("button", {}).get("payload"), message, update)
+                        self._process_button(message.get("button", {}).get("payload"), message, change["value"])
 
     def _get_crm_meta(self, number):
         change_status = self.env['crm.lead'].sudo().search(
@@ -99,11 +99,12 @@ class MailGatewayWhatsappService(models.AbstractModel):
         if button_template:
             button_record = request.env['whatsapp.template.button'].sudo().search(
                 [('name', '=', button_template), ('whatsapp_template_id', '=',
-                                                  request.env['whatsapp.template'].sudo().search(
-                                                      [('wa_ids.wa_id', '=like', parent_id)]).id)])
+                                                  request.env['whatsapp.template.waid'].sudo().search(
+                                                      [('mail_message_id', '=', parent_id)]).whatsapp_template_id.id)])
             if button_record.code:
                 model = button_record.env[button_record.model_id.model].with_context(
-                    json=update,
+                    button=button_template,
+                    waid=update.get('messages', [])[0].get('context', {}).get('id')
                 )
                 function_to_call = getattr(model, button_record.code, None)
                 if callable(function_to_call):
@@ -156,6 +157,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
             body = message.get("text").get("body")
         if message.get("payload_text"):
             body = message['payload_text']
+        if message.get("type") == 'button':
+            body = message.get('button').get('text')
         for key in ["image", "audio", "video", "document", "sticker"]:
             if message.get(key):
                 image_id = message.get(key).get("id")
@@ -528,8 +531,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
         if channel:
             message = channel.with_context({'is_template': True}).message_post(
                 body=body_message,
-                author_id=2 if self.env.context.get('internal') else self.env['res.partner'].search(
-                    [('user_id', '=', self.env.uid)]).id,
+                author_id=2 if self.env.context.get('internal') else self.env['res.users'].browse(
+                    self.env.uid).partner_id.id,
                 message_type="comment",
                 subtype_xmlid="mail.mt_comment",
                 gateway_type="whatsapp",
