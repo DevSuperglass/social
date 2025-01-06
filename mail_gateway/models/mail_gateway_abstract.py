@@ -7,6 +7,13 @@ class MailGatewayAbstract(models.AbstractModel):
     _name = "mail.gateway.abstract"
     _description = "Gateway abstract for functions"
 
+    def _get_parent_message(self, message):
+        context = message.get('context', {})
+        if context:
+            context_id = context.get('id')
+            return self.env['mail.message'].sudo().search([('whatsapp_id', '=like', context_id)],
+                                                          limit=1).id
+
     def _verify_update(self, bot_data, kwargs):
         return True
 
