@@ -5,7 +5,6 @@ from odoo import api, fields, models
 
 
 class MailMessageGatewayLink(models.TransientModel):
-
     _name = "mail.message.gateway.link"
     _description = "Link message from gateway"
 
@@ -33,11 +32,18 @@ class MailMessageGatewayLink(models.TransientModel):
             email_from=self.env.user.partner_id.email,
         )
         self.message_id.gateway_message_id = new_message
-        self.env["bus.bus"]._sendone(
-            self.env.user.partner_id,
+        [self.env["bus.bus"]._sendone(
+            partner,
             "mail.message/insert",
             {
                 "id": self.message_id.id,
                 "gateway_thread_data": self.message_id.sudo().gateway_thread_data,
             },
-        )
+        ) for partner in self.get_partner_ids()]
+
+    def get_partner_ids(self):
+        channel_id = self.env['mail.channel'].browse(self.message_id.res_id)
+        if channel_id.route_id:
+            return channel_id.route_id.sales_employee_ids.mapped('user_id').mapped('partner_id')
+        else:
+            return self.env['mail.gateway'].search([]).member_ids.partner_id
