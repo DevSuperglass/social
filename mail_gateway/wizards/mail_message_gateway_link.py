@@ -24,7 +24,6 @@ class MailMessageGatewayLink(models.TransientModel):
             author_id=self.message_id.author_id.id,
             gateway_type=self.message_id.gateway_type,
             date=self.message_id.date,
-            # message_id=update.message.message_id,
             subtype_xmlid="mail.mt_comment",
             message_type="comment",
             attachment_ids=self.message_id.attachment_ids.ids,
@@ -32,18 +31,16 @@ class MailMessageGatewayLink(models.TransientModel):
             email_from=self.env.user.partner_id.email,
         )
         self.message_id.gateway_message_id = new_message
-        [self.env["bus.bus"]._sendone(
-            partner,
-            "mail.message/insert",
-            {
+        self.env["bus.bus"].sudo()._sendmany(
+            [(partner, "mail.message/insert", {
                 "id": self.message_id.id,
                 "gateway_thread_data": self.message_id.sudo().gateway_thread_data,
-            },
-        ) for partner in self.get_partner_ids()]
+            }) for partner in self.get_partner_ids()]
+        )
 
     def get_partner_ids(self):
         channel_id = self.env['mail.channel'].browse(self.message_id.res_id)
         if channel_id.route_id:
             return channel_id.route_id.sales_employee_ids.mapped('user_id').mapped('partner_id')
         else:
-            return self.env['mail.gateway'].search([]).member_ids.partner_id
+            return self.env['mail.gateway'].search([]).member_ids.mapped('partner_id')

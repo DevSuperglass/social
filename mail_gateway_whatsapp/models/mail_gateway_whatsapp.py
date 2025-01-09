@@ -537,7 +537,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             ('channel_type', '=', 'gateway')
         ], limit=1)
 
-        if channel:
+        if channel and body_message != 'Atendimento encerrado':
             message = channel.with_context({'is_template': True}).message_post(
                 body=body_message,
                 author_id=2 if self.env.context.get('internal') else self.env['res.users'].browse(
@@ -548,4 +548,15 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 is_current_user_or_guest_author=True,
                 date=datetime.today(),
             )
-            return message
+        else:
+            message = self.env['mail.message'].create({
+                'body': body_message,
+                'message_type': 'comment',
+                'subtype_id': self.env.ref('mail.mt_comment').id,
+                'model': 'mail.channel',
+                'res_id': channel.id,
+                'author_id': 2,
+                'gateway_type': 'whatsapp',
+            })
+        self.env['mail.channel'].link_message_post(channel, message)
+        return message
