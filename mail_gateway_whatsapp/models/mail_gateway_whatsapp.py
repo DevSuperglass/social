@@ -183,6 +183,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     'whatsapp_id': message.get("id"),
                     'gateway_type': 'whatsapp',
                 })
+                chat._link_message_post(new_message)
             else:
                 new_message = chat.message_post(
                     body=body,
@@ -196,7 +197,6 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     whatsapp_id=message.get("id")
                 )
                 self._post_process_message(new_message, chat)
-            self._link_message_post(chat, new_message)
             return new_message
 
     def _check_parent_in_gerproc_messages(self, message):
@@ -259,51 +259,6 @@ class MailGatewayWhatsappService(models.AbstractModel):
                                                                                               mobile_list=[mobile],
                                                                                               body_message="Seu atendimento será iniciado em breve"
                                                                                               )
-
-    def _link_message_post(self, channel, message):
-        service_init = channel.message_ids.filtered(lambda lm: lm.gateway_thread_data).sorted('id', reverse=True)
-        service_end = channel.message_ids.filtered(lambda lm: lm.close_service).sorted('id', reverse=True)
-        service_init = service_init[0] if service_init else service_init
-        service_end = service_end[0].id if service_end else 0
-        if service_init and service_init.gateway_thread_data['model'] == 'quotation':
-            if service_end < service_init.id:
-                if not message.gateway_thread_data:
-                    message.gateway_thread_data = service_init.gateway_thread_data
-                new_message = self.env['quotation'].search(
-                    [('id', '=', service_init.gateway_thread_data['id']),
-                     ('active', 'in', [True, False])]).message_post(
-                    body=message.body,
-                    author_id=message.author_id.id,
-                    gateway_type=message.gateway_type,
-                    date=message.date,
-                    subtype_xmlid="mail.mt_comment",
-                    message_type="comment",
-                    attachment_ids=message.attachment_ids.ids,
-                    gateway_notifications=[],
-                    email_from=self.env.user.partner_id.email,
-                    parent_id=self.env['quotation'].search(
-                        [('id', '=', service_init.gateway_thread_data['id'])]).message_ids.filtered(
-                        lambda lm: message.parent_id.id in lm.gateway_message_ids.ids).id or 0
-                )
-                message.gateway_message_id = new_message
-                self.env["bus.bus"]._sendmany([(
-                    user,
-                    "mail.message/insert",
-                    {
-                        "id": message.id,
-                        "gateway_thread_data": message.sudo().gateway_thread_data,
-                    },
-                ) for user in (self.env.user.partner_id + self.env['mail.gateway'].search(
-                    []).member_ids.partner_id - self.env.user.partner_id)])
-        elif message.parent_id.gateway_thread_data:
-            if message.parent_id.gateway_thread_data['model'] == 'project_request':
-                message.email_from = self.env.user.partner_id.email,
-                self.env['mail.message.gateway.link'].create({
-                    'message_id': message.id,
-                    'resource_ref': "{},{}".format('project_request', message.parent_id.gateway_thread_data['id']),
-                    'client_id': self.env.user.partner_id.id
-                }).link_message()
-
     def _send(
         self,
         gateway,
@@ -618,5 +573,5 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'author_id': 2,
                 'gateway_type': 'whatsapp',
             })
-        self._link_message_post(channel, message)
+            channel._link_message_post(message)
         return message
