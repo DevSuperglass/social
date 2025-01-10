@@ -81,7 +81,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                             continue
                         message_id = self._process_update(chat, message, change["value"])
                         self._check_parent_in_gerproc_messages(message_id)
-                        self._set_queue(chat, message_id)
+                        self._set_queue(chat, message_id, message)
                         self._get_crm_meta(message.get("from"))
                         if message.get("type") != "button":
                             continue
@@ -169,18 +169,33 @@ class MailGatewayWhatsappService(models.AbstractModel):
             pass
         if len(body) > 0 or attachments:
             author = self._get_author(chat.gateway_id, value)
-            new_message = chat.message_post(
-                body=body,
-                author_id=author and author._name == "res.partner" and author.id,
-                gateway_type="whatsapp",
-                date=datetime.fromtimestamp(int(message["timestamp"])),
-                subtype_xmlid="mail.mt_comment",
-                message_type="comment",
-                attachments=attachments,
-                parent_id=self._get_parent_message(message),
-                whatsapp_id=message.get("id")
-            )
-            self._post_process_message(new_message, chat)
+            if message.get("type") == 'button' and body in self.env['whatsapp.template'].search(
+                [('name', 'in', ['confirmacao_cliente_imagem', 'confirmacao_cliente_sem_imagem'])]
+            ).mapped('button_ids').mapped('name') and not chat.queue_id:
+                new_message = self.env['mail.message'].create({
+                    'body': body,
+                    'message_type': 'comment',
+                    'subtype_id': self.env.ref('mail.mt_comment').id,
+                    'model': 'mail.channel',
+                    'res_id': chat.id,
+                    'author_id': author and author._name == "res.partner" and author.id,
+                    'parent_id': self._get_parent_message(message),
+                    'whatsapp_id': message.get("id"),
+                    'gateway_type': 'whatsapp',
+                })
+            else:
+                new_message = chat.message_post(
+                    body=body,
+                    author_id=author and author._name == "res.partner" and author.id,
+                    gateway_type="whatsapp",
+                    date=datetime.fromtimestamp(int(message["timestamp"])),
+                    subtype_xmlid="mail.mt_comment",
+                    message_type="comment",
+                    attachments=attachments,
+                    parent_id=self._get_parent_message(message),
+                    whatsapp_id=message.get("id")
+                )
+                self._post_process_message(new_message, chat)
             self._link_message_post(chat, new_message)
             return new_message
 
@@ -221,11 +236,11 @@ class MailGatewayWhatsappService(models.AbstractModel):
             else:
                 _logger.warning("Button template not found")
 
-    def _set_queue(self, channel_id, message_id):
+    def _set_queue(self, channel_id, message_id, message):
         """
             Reserva do atendimento para que seja ordenado de forma correta.
         """
-        if not channel_id.queue_id:
+        if not channel_id.queue_id and message.get('type') == 'text':
             partner_id = self.env['res.partner.gateway.channel'].search(
                 [('gateway_token', '=', channel_id.gateway_channel_token)]).partner_id
             channel_id.write({'queue_id': self.env['quotation.queue'].sudo().create(
