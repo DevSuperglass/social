@@ -87,67 +87,6 @@ class MailGatewayWhatsappService(models.AbstractModel):
                             continue
                         self._process_button(message.get("button", {}).get("payload"), message, change["value"])
 
-    def _check_parent_in_gerproc_messages(self, message):
-        link_id = message.parent_id.gateway_message_id
-        if link_id and link_id.model == 'project_request':
-            self.env['mail.message.gateway.link'].create({
-                'message_id': message.id,
-                'resource_ref': "{},{}".format(link_id.model, link_id.res_id),
-                'client_id': self.env.user.partner_id.id
-            }).link_message()
-
-    def _get_crm_meta(self, number):
-        change_status = self.env['crm.lead'].sudo().search(
-            [('mobile', '=', number), ('new_status', '=', 'draft')])
-
-        if change_status:
-            change_status.new_status = 'in_progress'
-            change_status.remove_button = True
-
-    def _process_button(self, button_template, message, update):
-        parent_id = self._get_parent_message(message)
-        if button_template:
-            button_record = request.env['whatsapp.template.button'].sudo().search(
-                [('name', '=', button_template), ('whatsapp_template_id', '=',
-                                                  request.env['whatsapp.template.waid'].sudo().search(
-                                                      [('mail_message_id', '=', parent_id)]).whatsapp_template_id.id)])
-            if button_record.code:
-                model = button_record.env[button_record.model_id.model].with_context(
-                    button=button_template,
-                    waid=update.get('messages', [])[0].get('context', {}).get('id')
-                )
-                function_to_call = getattr(model, button_record.code, None)
-                if callable(function_to_call):
-                    function_to_call()
-                else:
-                    return False
-            else:
-                _logger.warning("Button template not found")
-
-    def _set_queue(self, channel_id, message_id):
-        """
-            Reserva do atendimento para que seja ordenado de forma correta.
-        """
-        if not channel_id.queue_id:
-            partner_id = self.env['res.partner.gateway.channel'].search(
-                [('gateway_token', '=', channel_id.gateway_channel_token)]).partner_id
-            channel_id.write({'queue_id': self.env['quotation.queue'].sudo().create(
-                {'channel_id': channel_id.id,
-                 'partner_id': partner_id.id,
-                 'start_message_id': message_id.id}).id,
-                              'queue_priority': int(partner_id.priority_rating)})
-            self._send_attendance_start(mobile=channel_id.gateway_channel_token)
-
-    def _send_attendance_start(self, mobile):
-        self.env['mail.gateway.whatsapp'].with_context({'internal': True})._send_tmpl_message(tmpl_name=None,
-                                                                                              gateway_phone=self.env[
-                                                                                                  'res.config.settings'].sudo().search(
-                                                                                                  []).verify_if_test_environment(),
-                                                                                              components="Seu atendimento será iniciado em breve",
-                                                                                              mobile_list=[mobile],
-                                                                                              body_message="Seu atendimento será iniciado em breve"
-                                                                                              )
-
     @staticmethod
     def convert_audio(content):
         ogg_audio = AudioSegment.from_file(BytesIO(content), format="ogg")
@@ -242,7 +181,113 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 whatsapp_id=message.get("id")
             )
             self._post_process_message(new_message, chat)
+            self._link_message_post(chat, new_message)
             return new_message
+
+    def _check_parent_in_gerproc_messages(self, message):
+        link_id = message.parent_id.gateway_message_id
+        if link_id and link_id.model == 'project_request':
+            self.env['mail.message.gateway.link'].create({
+                'message_id': message.id,
+                'resource_ref': "{},{}".format(link_id.model, link_id.res_id),
+                'client_id': self.env.user.partner_id.id
+            }).link_message()
+
+    def _get_crm_meta(self, number):
+        change_status = self.env['crm.lead'].sudo().search(
+            [('mobile', '=', number), ('new_status', '=', 'draft')])
+
+        if change_status:
+            change_status.new_status = 'in_progress'
+            change_status.remove_button = True
+
+    def _process_button(self, button_template, message, update):
+        parent_id = self._get_parent_message(message)
+        if button_template:
+            button_record = request.env['whatsapp.template.button'].sudo().search(
+                [('name', '=', button_template), ('whatsapp_template_id', '=',
+                                                  request.env['whatsapp.template.waid'].sudo().search(
+                                                      [('mail_message_id', '=', parent_id)]).whatsapp_template_id.id)])
+            if button_record.code:
+                model = button_record.env[button_record.model_id.model].with_context(
+                    button=button_template,
+                    waid=update.get('messages', [])[0].get('context', {}).get('id')
+                )
+                function_to_call = getattr(model, button_record.code, None)
+                if callable(function_to_call):
+                    function_to_call()
+                else:
+                    return False
+            else:
+                _logger.warning("Button template not found")
+
+    def _set_queue(self, channel_id, message_id):
+        """
+            Reserva do atendimento para que seja ordenado de forma correta.
+        """
+        if not channel_id.queue_id:
+            partner_id = self.env['res.partner.gateway.channel'].search(
+                [('gateway_token', '=', channel_id.gateway_channel_token)]).partner_id
+            channel_id.write({'queue_id': self.env['quotation.queue'].sudo().create(
+                {'channel_id': channel_id.id,
+                 'partner_id': partner_id.id,
+                 'start_message_id': message_id.id}).id,
+                              'queue_priority': int(partner_id.priority_rating)})
+            self._send_attendance_start(mobile=channel_id.gateway_channel_token)
+
+    def _send_attendance_start(self, mobile):
+        self.env['mail.gateway.whatsapp'].with_context({'internal': True})._send_tmpl_message(tmpl_name=None,
+                                                                                              gateway_phone=self.env[
+                                                                                                  'res.config.settings'].sudo().search(
+                                                                                                  []).verify_if_test_environment(),
+                                                                                              components="Seu atendimento será iniciado em breve",
+                                                                                              mobile_list=[mobile],
+                                                                                              body_message="Seu atendimento será iniciado em breve"
+                                                                                              )
+
+    def _link_message_post(self, channel, message):
+        service_init = channel.message_ids.filtered(lambda lm: lm.gateway_thread_data).sorted('id', reverse=True)
+        service_end = channel.message_ids.filtered(lambda lm: lm.close_service).sorted('id', reverse=True)
+        service_init = service_init[0] if service_init else service_init
+        service_end = service_end[0].id if service_end else 0
+        if service_init and service_init.gateway_thread_data['model'] == 'quotation':
+            if service_end < service_init.id:
+                if not message.gateway_thread_data:
+                    message.gateway_thread_data = service_init.gateway_thread_data
+                new_message = self.env['quotation'].search(
+                    [('id', '=', service_init.gateway_thread_data['id']),
+                     ('active', 'in', [True, False])]).message_post(
+                    body=message.body,
+                    author_id=message.author_id.id,
+                    gateway_type=message.gateway_type,
+                    date=message.date,
+                    subtype_xmlid="mail.mt_comment",
+                    message_type="comment",
+                    attachment_ids=message.attachment_ids.ids,
+                    gateway_notifications=[],
+                    email_from=self.env.user.partner_id.email,
+                    parent_id=self.env['quotation'].search(
+                        [('id', '=', service_init.gateway_thread_data['id'])]).message_ids.filtered(
+                        lambda lm: message.parent_id.id in lm.gateway_message_ids.ids).id or 0
+                )
+                message.gateway_message_id = new_message
+                self.env["bus.bus"]._sendmany([(
+                    user,
+                    "mail.message/insert",
+                    {
+                        "id": message.id,
+                        "gateway_thread_data": message.sudo().gateway_thread_data,
+                    },
+                ) for user in (self.env.user.partner_id + self.env['mail.gateway'].search(
+                    []).member_ids.partner_id - self.env.user.partner_id)])
+        elif message.parent_id.gateway_thread_data:
+            if message.parent_id.gateway_thread_data['model'] == 'project_request':
+                message.email_from = self.env.user.partner_id.email,
+                self.env['mail.message.gateway.link'].create({
+                    'message_id': message.id,
+                    'resource_ref': "{},{}".format('project_request', message.parent_id.gateway_thread_data['id']),
+                    'client_id': self.env.user.partner_id.id
+                }).link_message()
 
     def _send(
         self,
@@ -558,5 +603,5 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'author_id': 2,
                 'gateway_type': 'whatsapp',
             })
-        self.env['mail.channel'].link_message_post(channel, message)
+        self._link_message_post(channel, message)
         return message
