@@ -80,7 +80,6 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         if not chat:
                             continue
                         message_id = self._process_update(chat, message, change["value"])
-                        self._check_parent_in_gerproc_messages(message_id)
                         self._set_queue(chat, message_id, message)
                         self._get_crm_meta(message.get("from"))
                         if message.get("type") != "button":
@@ -198,15 +197,6 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 )
                 self._post_process_message(new_message, chat)
             return new_message
-
-    def _check_parent_in_gerproc_messages(self, message):
-        link_id = message.parent_id.gateway_message_id
-        if link_id and link_id.model == 'project_request':
-            self.env['mail.message.gateway.link'].create({
-                'message_id': message.id,
-                'resource_ref': "{},{}".format(link_id.model, link_id.res_id),
-                'client_id': self.env.user.partner_id.id
-            }).link_message()
 
     def _get_crm_meta(self, number):
         change_status = self.env['crm.lead'].sudo().search(
@@ -341,7 +331,6 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     {"notification_status": "exception", "failure_reason": exc}
                 )
         if message:
-            self._check_parent_in_gerproc_messages(record.mail_message_id)
             record.sudo().write(
                 {
                     "notification_status": "sent",
