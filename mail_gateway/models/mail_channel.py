@@ -60,16 +60,14 @@ class MailChannel(models.Model):
             and not self.env.context.get("no_gateway_notification", False)
             and message.message_type != "notification"
         ):
-            mail_notification_id = self.env["mail.notification"].create(
+            self.env["mail.notification"].create(
                 {
                     "mail_message_id": message.id,
                     "gateway_channel_id": self.id,
                     "notification_type": "gateway",
                     "gateway_type": self.gateway_id.gateway_type,
                 }
-            )
-            if not self.env.context.get("is_template", False):
-                mail_notification_id.send_gateway()
+            ).send_gateway()
         return message
 
     def _message_update_content_after_hook(self, message):
