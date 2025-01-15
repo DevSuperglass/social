@@ -182,6 +182,25 @@ class MailGatewayWhatsappService(models.AbstractModel):
             self._post_process_message(new_message, chat)
             return new_message
 
+    def _set_queue(self, channel_id, message_id, message):
+        """
+            Reserva do atendimento para que seja ordenado de forma correta.
+        """
+        if message.get("text"):
+            body = message.get("text").get("body")
+        if message.get("type") == 'button':
+            body = message.get('button').get('text')
+        if not channel_id.queue_id and (
+            message.get("text") or message.get("type") == 'button' and body not in ['CONFIRMAR', 'DESISTIR']):
+            partner_id = self.env['res.partner.gateway.channel'].search(
+                [('gateway_token', '=', channel_id.gateway_channel_token)]).partner_id
+            channel_id.write({'queue_id': self.env['quotation.queue'].sudo().create(
+                {'channel_id': channel_id.id,
+                 'partner_id': partner_id.id,
+                 'start_message_id': message_id.id}).id,
+                              'queue_priority': int(partner_id.priority_rating)})
+            self._send_attendance_start(mobile=channel_id.gateway_channel_token)
+
     def _get_crm_meta(self, number):
         change_status = self.env['crm.lead'].sudo().search(
             [('mobile', '=', number), ('new_status', '=', 'draft')])
@@ -209,25 +228,6 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     return False
             else:
                 _logger.warning("Button template not found")
-
-    def _set_queue(self, channel_id, message_id, message):
-        """
-            Reserva do atendimento para que seja ordenado de forma correta.
-        """
-        if message.get("text"):
-            body = message.get("text").get("body")
-        if message.get("type") == 'button':
-            body = message.get('button').get('text')
-        if not channel_id.queue_id and (
-            message.get("text") or message.get("type") == 'button' and body not in ['CONFIRMAR', 'DESISTIR']):
-            partner_id = self.env['res.partner.gateway.channel'].search(
-                [('gateway_token', '=', channel_id.gateway_channel_token)]).partner_id
-            channel_id.write({'queue_id': self.env['quotation.queue'].sudo().create(
-                {'channel_id': channel_id.id,
-                 'partner_id': partner_id.id,
-                 'start_message_id': message_id.id}).id,
-                              'queue_priority': int(partner_id.priority_rating)})
-            self._send_attendance_start(mobile=channel_id.gateway_channel_token)
 
     def _send_attendance_start(self, mobile):
         self.env['mail.gateway.whatsapp'].with_context({'internal': True})._send_tmpl_message(tmpl_name=None,
@@ -523,7 +523,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'json': json,
                 'mail_message_id': message.id,
             })
-        return message
+            return message
 
     def create_message(self, mobile, body_message):
         channel = self.env['mail.channel'].search([
@@ -531,26 +531,15 @@ class MailGatewayWhatsappService(models.AbstractModel):
             ('channel_type', '=', 'gateway')
         ], limit=1)
 
-        if channel and body_message != 'Atendimento encerrado':
-            message = channel.with_context({'is_template': True}).message_post(
+        if channel:
+            message = channel.message_post(
                 body=body_message,
                 author_id=2 if self.env.context.get('internal') else self.env['res.users'].browse(
                     self.env.uid).partner_id.id,
                 message_type="comment",
                 subtype_xmlid="mail.mt_comment",
                 gateway_type="whatsapp",
-                is_current_user_or_guest_author=True,
                 date=datetime.today(),
             )
-        else:
-            message = self.env['mail.message'].create({
-                'body': body_message,
-                'message_type': 'comment',
-                'subtype_id': self.env.ref('mail.mt_comment').id,
-                'model': 'mail.channel',
-                'res_id': channel.id,
-                'author_id': 2,
-                'gateway_type': 'whatsapp',
-            })
-            channel._link_message_post(message)
-        return message
+            self._post_process_message(message, channel)
+            return message
