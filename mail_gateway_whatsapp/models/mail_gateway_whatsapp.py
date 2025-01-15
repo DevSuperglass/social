@@ -532,7 +532,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
         ], limit=1)
 
         if channel:
-            message = channel.message_post(
+            message = channel.with_context({'no_gateway_notification': True}).message_post(
                 body=body_message,
                 author_id=2 if self.env.context.get('internal') else self.env['res.users'].browse(
                     self.env.uid).partner_id.id,
