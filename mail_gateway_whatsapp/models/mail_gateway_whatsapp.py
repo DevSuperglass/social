@@ -198,7 +198,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 {'channel_id': channel_id.id,
                  'partner_id': partner_id.id,
                  'initial_date': datetime.now(),
-                 'start_message_id': message_id.id}).id,
+                 'start_message_id': message_id.id,
+                 'quotation_id': message_id.gateway_message_id.res_id
+                 if message_id.gateway_message_id.model == 'quotation' else False}).id,
                               'queue_priority': int(partner_id.priority_rating)})
             self._send_attendance_start(mobile=channel_id.gateway_channel_token)
 
