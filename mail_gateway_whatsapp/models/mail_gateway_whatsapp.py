@@ -197,6 +197,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             channel_id.write({'queue_id': self.env['quotation.queue'].sudo().create(
                 {'channel_id': channel_id.id,
                  'partner_id': partner_id.id,
+                 'initial_date': datetime.now(),
                  'start_message_id': message_id.id}).id,
                               'queue_priority': int(partner_id.priority_rating)})
             self._send_attendance_start(mobile=channel_id.gateway_channel_token)
