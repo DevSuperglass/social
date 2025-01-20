@@ -462,7 +462,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
         number = update.get("messages")[0].get("from")
         if not request.env['res.partner'].sudo().search([('phone_sanitized', '=', "+" + number)]):
             vals_list = {
-                'name': update['entry'][0]['changes'][0]['value']['contacts'][0]['profile']['name'],
+                'name': update['contacts'][0]['profile']['name'],
             }
 
             vals_list.update({'phone': number, 'whatsapp_contact': 'phone'}) if len(number) == 12 else vals_list.update(
