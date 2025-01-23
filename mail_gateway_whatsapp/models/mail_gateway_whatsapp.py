@@ -113,16 +113,6 @@ class MailGatewayWhatsappService(models.AbstractModel):
             else:
                 _logger.warning("Button template not found")
 
-    def _send_attendance_start(self, mobile):
-        self.env['mail.gateway.whatsapp']._send_tmpl_message(tmpl_name=None,
-                                                             gateway_phone=self.env[
-                                                                 'res.config.settings'].sudo().search(
-                                                                 []).verify_if_test_environment(),
-                                                             components="Seu atendimento será iniciado em breve",
-                                                             mobile_list=[mobile],
-                                                             body_message="Seu atendimento será iniciado em breve"
-                                                             )
-
     @staticmethod
     def convert_audio(content):
         ogg_audio = AudioSegment.from_file(BytesIO(content), format="ogg")
@@ -210,7 +200,6 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 author_id=author and author._name == "res.partner" and author.id,
                 gateway_type="whatsapp",
                 date=datetime.fromtimestamp(int(message["timestamp"])),
-                # message_id=update.message.message_id,
                 subtype_xmlid="mail.mt_comment",
                 message_type="comment",
                 attachments=attachments,
