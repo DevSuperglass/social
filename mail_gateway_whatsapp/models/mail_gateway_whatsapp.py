@@ -83,7 +83,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         self._get_crm_meta(message.get("from"))
                         if message.get("type") != "button":
                             continue
-                        self._process_button(message.get("button", {}).get("payload"), message, update)
+                        self._process_button(message.get("button", {}).get("payload"), message)
 
     def _get_crm_meta(self, number):
         change_status = self.env['crm.lead'].sudo().search(
@@ -93,7 +93,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             change_status.new_status = 'in_progress'
             change_status.remove_button = True
 
-    def _process_button(self, button_template, message, update):
+    def _process_button(self, button_template, message):
         parent_id = self._get_parent_message(message)
         if button_template:
             button_record = request.env['whatsapp.template.button'].sudo().search(
@@ -103,7 +103,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             if button_record.code:
                 model = button_record.env[button_record.model_id.model].with_context(
                     button=button_template,
-                    waid=update.get('messages', [])[0].get('context', {}).get('id')
+                    waid=message.get('context', {}).get('id')
                 )
                 function_to_call = getattr(model, button_record.code, None)
                 if callable(function_to_call):
