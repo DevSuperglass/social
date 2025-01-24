@@ -24,7 +24,6 @@ registerPatch({
             compute() {
                 if (
                     this.message.gateway_type &&
-                    !this.message.gatewayThread &&
                     this.message.originThread.model === "mail.channel"
                 ) {
                     return {};
