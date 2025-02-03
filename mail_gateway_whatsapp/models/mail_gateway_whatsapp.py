@@ -79,39 +79,12 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         )
                         if not chat:
                             continue
-                        self._process_update(chat, message, change["value"])
+                        message_id = self._process_update(chat, message, change["value"])
+                        self._set_queue(chat, message_id, message)
                         self._get_crm_meta(message.get("from"))
                         if message.get("type") != "button":
                             continue
                         self._process_button(message.get("button", {}).get("payload"), message)
-
-    def _get_crm_meta(self, number):
-        change_status = self.env['crm.lead'].sudo().search(
-            [('mobile', '=', number), ('new_status', '=', 'draft')])
-
-        if change_status:
-            change_status.new_status = 'in_progress'
-            change_status.remove_button = True
-
-    def _process_button(self, button_template, message):
-        parent_id = self._get_parent_message(message)
-        if button_template:
-            button_record = request.env['whatsapp.template.button'].sudo().search(
-                [('name', '=', button_template), ('whatsapp_template_id', '=',
-                                                  request.env['whatsapp.template.waid'].sudo().search(
-                                                      [('mail_message_id', '=', parent_id)]).whatsapp_template_id.id)])
-            if button_record.code:
-                model = button_record.env[button_record.model_id.model].with_context(
-                    button=button_template,
-                    waid=message.get('context', {}).get('id')
-                )
-                function_to_call = getattr(model, button_record.code, None)
-                if callable(function_to_call):
-                    function_to_call()
-                else:
-                    return False
-            else:
-                _logger.warning("Button template not found")
 
     @staticmethod
     def convert_audio(content):
@@ -208,6 +181,66 @@ class MailGatewayWhatsappService(models.AbstractModel):
             )
             self._post_process_message(new_message, chat)
             return new_message
+
+    def _set_queue(self, channel_id, message_id, message):
+        """
+            Criação de atendimento.
+        """
+        if message.get("text"):
+            body = message.get("text").get("body")
+        if message.get("type") == 'button':
+            body = message.get('button').get('text')
+        if not channel_id.queue_id and (
+            message.get("text") or message.get("type") == 'button' and body not in ['CONFIRMAR', 'DESISTIR']):
+            partner_id = self.env['res.partner.gateway.channel'].search(
+                [('gateway_token', '=', channel_id.gateway_channel_token)]).partner_id
+            channel_id.write({'queue_id': self.env['quotation.queue'].sudo().create(
+                {'channel_id': channel_id.id,
+                 'partner_id': partner_id.id,
+                 'initial_date': datetime.now(),
+                 'start_message_id': message_id.id,
+                 'quotation_id': message_id.gateway_message_id.res_id
+                 if message_id.gateway_message_id.model == 'quotation' else False}).id,
+                              'queue_priority': int(partner_id.priority_rating)})
+            self._send_attendance_start(mobile=channel_id.gateway_channel_token)
+
+    def _send_attendance_start(self, mobile):
+        self.with_context({'internal': True})._send_tmpl_message(tmpl_name=None,
+                                                                 gateway_phone=self.env[
+                                                                     'res.config.settings'].sudo().search(
+                                                                     []).verify_if_test_environment(),
+                                                                 components="Seu atendimento será iniciado em breve",
+                                                                 mobile_list=[mobile],
+                                                                 body_message="Seu atendimento será iniciado em breve"
+                                                                 )
+
+    def _get_crm_meta(self, number):
+        change_status = self.env['crm.lead'].sudo().search(
+            [('mobile', '=', number), ('new_status', '=', 'draft')])
+
+        if change_status:
+            change_status.new_status = 'in_progress'
+            change_status.remove_button = True
+
+    def _process_button(self, button_template, message):
+        parent_id = self._get_parent_message(message)
+        if button_template:
+            button_record = request.env['whatsapp.template.button'].sudo().search(
+                [('name', '=', button_template), ('whatsapp_template_id', '=',
+                                                  request.env['whatsapp.template.waid'].sudo().search(
+                                                      [('mail_message_id', '=', parent_id)]).whatsapp_template_id.id)])
+            if button_record.code:
+                model = button_record.env[button_record.model_id.model].with_context(
+                    button=button_template,
+                    waid=message.get('context', {}).get('id')
+                )
+                function_to_call = getattr(model, button_record.code, None)
+                if callable(function_to_call):
+                    function_to_call()
+                else:
+                    return False
+            else:
+                _logger.warning("Button template not found")
 
     def _send(
         self,
