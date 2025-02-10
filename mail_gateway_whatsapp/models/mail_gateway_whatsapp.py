@@ -205,14 +205,14 @@ class MailGatewayWhatsappService(models.AbstractModel):
             self._send_attendance_start(mobile=channel_id.gateway_channel_token)
 
     def _send_attendance_start(self, mobile):
-        self.with_context({'internal': True})._send_tmpl_message(tmpl_name=None,
-                                                                 gateway_phone=self.env[
-                                                                     'res.config.settings'].sudo().search(
-                                                                     []).verify_if_test_environment(),
-                                                                 components="Seu atendimento será iniciado em breve",
-                                                                 mobile_list=[mobile],
-                                                                 body_message="Seu atendimento será iniciado em breve"
-                                                                 )
+        self.with_context({'is_internal': True})._send_tmpl_message(tmpl_name=None,
+                                                                                              gateway_phone=self.env[
+                                                                                                  'res.config.settings'].sudo().search(
+                                                                                                  []).verify_if_test_environment(),
+                                                                                              components="Seu atendimento será iniciado em breve",
+                                                                                              mobile_list=[mobile],
+                                                                                              body_message="Seu atendimento será iniciado em breve"
+                                                                                              )
 
     def _get_crm_meta(self, number):
         change_status = self.env['crm.lead'].sudo().search(
