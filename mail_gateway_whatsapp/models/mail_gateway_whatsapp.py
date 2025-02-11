@@ -168,7 +168,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
             pass
         if len(body) > 0 or attachments:
             author = self._get_author(chat.gateway_id, value)
-            new_message = chat.message_post(
+            new_message = chat.with_context(
+                {'no_auto_pin': self.get_queueless_messages(message=message) and not chat.queue_id}
+            ).message_post(
                 body=body,
                 author_id=author and author._name == "res.partner" and author.id,
                 gateway_type="whatsapp",
@@ -186,12 +188,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
         """
             Criação de atendimento.
         """
-        if message.get("text"):
-            body = message.get("text").get("body")
-        if message.get("type") == 'button':
-            body = message.get('button').get('text')
-        if not channel_id.queue_id and (
-            message.get("text") or message.get("type") == 'button' and body not in ['CONFIRMAR', 'DESISTIR']):
+
+        if not channel_id.queue_id and not self.get_queueless_messages(message=message):
             partner_id = self.env['res.partner.gateway.channel'].search(
                 [('gateway_token', '=', channel_id.gateway_channel_token)]).partner_id
             channel_id.write({'queue_id': self.env['quotation.queue'].sudo().create(
@@ -204,15 +202,26 @@ class MailGatewayWhatsappService(models.AbstractModel):
                               'queue_priority': int(partner_id.priority_rating)})
             self._send_attendance_start(mobile=channel_id.gateway_channel_token)
 
+    @staticmethod
+    def get_queueless_messages(message, body=False):
+        if message.get("text"):
+            body = message.get("text").get("body")
+        if message.get("type") == 'button':
+            body = message.get('button').get('text')
+
+        if message.get("text") or message.get("type") == 'button' and body not in ['CONFIRMAR', 'DESISTIR']:
+            return False
+        return True
+
     def _send_attendance_start(self, mobile):
         self.with_context({'is_internal': True})._send_tmpl_message(tmpl_name=None,
-                                                                                              gateway_phone=self.env[
-                                                                                                  'res.config.settings'].sudo().search(
-                                                                                                  []).verify_if_test_environment(),
-                                                                                              components="Seu atendimento será iniciado em breve",
-                                                                                              mobile_list=[mobile],
-                                                                                              body_message="Seu atendimento será iniciado em breve"
-                                                                                              )
+                                                                    gateway_phone=self.env[
+                                                                        'res.config.settings'].sudo().search(
+                                                                        []).verify_if_test_environment(),
+                                                                    components="Seu atendimento será iniciado em breve",
+                                                                    mobile_list=[mobile],
+                                                                    body_message="Seu atendimento será iniciado em breve"
+                                                                    )
 
     def _get_crm_meta(self, number):
         change_status = self.env['crm.lead'].sudo().search(
@@ -535,7 +544,10 @@ class MailGatewayWhatsappService(models.AbstractModel):
         ], limit=1)
 
         if channel:
-            message = channel.with_context({'no_gateway_notification': True}).message_post(
+            message = channel.with_context({
+                'no_gateway_notification': True,
+                'no_auto_pin': self._context.get('no_auto_pin') and not channel.queue_id
+            }).message_post(
                 body=body_message,
                 author_id=2 if self.env.context.get('is_internal') else self.env['res.users'].browse(
                     self.env.uid).partner_id.id,
