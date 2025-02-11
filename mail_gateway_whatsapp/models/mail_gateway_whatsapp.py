@@ -169,7 +169,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
         if len(body) > 0 or attachments:
             author = self._get_author(chat.gateway_id, value)
             new_message = chat.with_context(
-                {'no_auto_pin': self.get_queueless_messages(message=message) and not chat.queue_id}
+                {'no_auto_pin': self.is_no_pin_message(message=message) and not chat.queue_id}
             ).message_post(
                 body=body,
                 author_id=author and author._name == "res.partner" and author.id,
@@ -189,7 +189,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             Criação de atendimento.
         """
 
-        if not channel_id.queue_id and not self.get_queueless_messages(message=message):
+        if not channel_id.queue_id and not self.is_no_pin_message(message=message):
             partner_id = self.env['res.partner.gateway.channel'].search(
                 [('gateway_token', '=', channel_id.gateway_channel_token)]).partner_id
             channel_id.write({'queue_id': self.env['quotation.queue'].sudo().create(
@@ -203,7 +203,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             self._send_attendance_start(mobile=channel_id.gateway_channel_token)
 
     @staticmethod
-    def get_queueless_messages(message, body=False):
+    def is_no_pin_message(message, body=False):
         if message.get("text"):
             body = message.get("text").get("body")
         if message.get("type") == 'button':
