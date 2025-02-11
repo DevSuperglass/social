@@ -203,15 +203,12 @@ class MailGatewayWhatsappService(models.AbstractModel):
             self._send_attendance_start(mobile=channel_id.gateway_channel_token)
 
     @staticmethod
-    def is_no_pin_message(message, body=False):
-        if message.get("text"):
-            body = message.get("text").get("body")
-        if message.get("type") == 'button':
-            body = message.get('button').get('text')
+    def is_no_pin_message(message):
+        body = message.get('button', {}).get('text')
 
-        if message.get("text") or message.get("type") == 'button' and body not in ['CONFIRMAR', 'DESISTIR']:
-            return False
-        return True
+        if body in ['CONFIRMAR', 'DESISTIR']:
+            return True
+        return False
 
     def _send_attendance_start(self, mobile):
         self.with_context({'is_internal': True})._send_tmpl_message(tmpl_name=None,
