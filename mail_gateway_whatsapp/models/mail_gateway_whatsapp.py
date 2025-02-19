@@ -183,7 +183,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
             Criação de atendimento.
         """
 
-        if not channel_id.queue_id and not self.is_no_pin_message(message=message):
+        if not channel_id.queue_id and not self.is_no_pin_message(
+            message=message
+        ) and channel_id.gateway_id.whatsapp_from_phone == '335789752960181':
             partner_id = self.env['res.partner.gateway.channel'].search(
                 [('gateway_token', '=', channel_id.gateway_channel_token)]).partner_id
             channel_id.write({'queue_id': self.env['quotation.queue'].sudo().create(
@@ -206,9 +208,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
     def _send_attendance_start(self, mobile):
         self.with_context({'is_internal': True})._send_tmpl_message(tmpl_name=None,
-                                                                    gateway_phone=self.env[
-                                                                        'res.config.settings'].sudo().search(
-                                                                        []).verify_if_test_environment(),
+                                                                    gateway_phone='335789752960181',
                                                                     components="Seu atendimento será iniciado em breve",
                                                                     mobile_list=[mobile],
                                                                     body_message="Seu atendimento será iniciado em breve"
@@ -491,7 +491,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
         tmpl_id = self.env['whatsapp.template'].search([('name', '=', tmpl_name)], limit=1)
 
         for mobile in mobile_list:
-            message = self.create_message(mobile, body_message)
+            message = self.create_message(mobile, body_message, gateway)
             if not message:
                 raise UserError(
                     f'O número de telefone {mobile} não é válido. Para realizar o envio, utilize o seguinte formato: 55DDD(9)Telefone. Exemplo: 5511912345678.')
@@ -530,10 +530,10 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'mail_message_id': message.id,
             })
 
-    def create_message(self, mobile, body_message):
+    def create_message(self, mobile, body_message, gateway_id):
         channel = self.env['mail.channel'].search([
             ('gateway_channel_token', '=', mobile),
-            ('channel_type', '=', 'gateway')
+            ('gateway_id', '=', gateway_id.id)
         ], limit=1)
 
         if channel:
