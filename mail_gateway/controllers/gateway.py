@@ -72,6 +72,23 @@ class GatewayController(Controller):
             .with_context(no_gateway_notification=True)
         )
 
+        if not dispatcher._verify_update(bot_data, jsonrequest):
+            _logger.warning(
+                "Message could not be verified for token %s with usage %s", token, usage
+            )
+            return request.make_response(
+                json.dumps({}),
+                [
+                    ("Content-Type", "application/json"),
+                ],
+            )
+        _logger.debug(
+            "Received message for token %s with usage %s: %s",
+            token,
+            usage,
+            json.dumps(jsonrequest),
+        )
+
         gateway = dispatcher.env["mail.gateway"].browse(bot_data["id"])
         dispatcher._receive_update(gateway, jsonrequest)
 
