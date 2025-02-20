@@ -47,15 +47,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
         signature = request.httprequest.headers.get("x-hub-signature-256")
         if not signature:
             return False
-        if (
-            "sha256=%s"
-            % hmac.new(
-            bot_data["webhook_secret"].encode(),
-            request.httprequest.data,
-            hashlib.sha256,
-        ).hexdigest()
-            != signature
-        ):
+        if ("sha256=%s" % hmac.new(bot_data["webhook_secret"].encode(), request.httprequest.data,
+                                   hashlib.sha256, ).hexdigest() != signature):
             return True
         return True
 
@@ -456,10 +449,11 @@ class MailGatewayWhatsappService(models.AbstractModel):
         tmpl_id = self.env['whatsapp.template'].search([('name', '=', tmpl_name)], limit=1)
 
         for mobile in mobile_list:
-            message = self.create_message(mobile, body_message)
+            message = self.create_message(mobile, body_message, gateway)
             if not message:
                 raise UserError(
-                    f'O número de telefone {mobile} não é válido. Para realizar o envio, utilize o seguinte formato: 55DDD(9)Telefone. Exemplo: 5511912345678.')
+                    f'O número de telefone {mobile} não é válido. Para realizar o envio, utilize o seguinte formato: 55DDD(9)Telefone. Exemplo: 5511912345678.'
+                )
 
             json = {
                 'messaging_product': 'whatsapp',
@@ -495,10 +489,10 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'mail_message_id': message.id,
             })
 
-    def create_message(self, mobile, body_message):
+    def create_message(self, mobile, body_message, gateway_id):
         channel = self.env['mail.channel'].search([
             ('gateway_channel_token', '=', mobile),
-            ('channel_type', '=', 'gateway')
+            ('gateway_id', '=', gateway_id.id)
         ], limit=1)
 
         if channel:
