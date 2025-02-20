@@ -47,9 +47,15 @@ class MailGatewayWhatsappService(models.AbstractModel):
         signature = request.httprequest.headers.get("x-hub-signature-256")
         if not signature:
             return False
-        if ("sha256=%s" % hmac.new(bot_data["webhook_secret"].encode(), request.httprequest.data,
-                                   hashlib.sha256, ).hexdigest() != signature):
-            return True
+        if (
+            "sha256=%s"
+            % hmac.new(
+            bot_data["webhook_secret"].encode(),
+            request.httprequest.data,
+            hashlib.sha256, ).hexdigest()
+            != signature
+        ):
+            return False
         return True
 
     def _get_channel_vals(self, gateway, token, update):
