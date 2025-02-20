@@ -427,14 +427,16 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
     def _get_partner(self, update):
         number = update.get("messages")[0].get("from")
-        if not request.env['res.partner'].sudo().search([('phone_sanitized', '=', "+" + number)]):
+        partner_id = request.env['res.partner'].sudo().search([('phone_sanitized', '=', "+" + number)])
+        if not partner_id:
             vals_list = {
                 'name': update['contacts'][0]['profile']['name'],
             }
 
             vals_list.update({'phone': number, 'whatsapp_contact': 'phone'}) if len(number) == 12 else vals_list.update(
                 {'mobile': number, 'whatsapp_contact': 'mobile'})
-            return request.env['res.partner'].sudo().create(vals_list)
+            partner_id = request.env['res.partner'].sudo().create(vals_list)
+        return partner_id
 
     def _get_author_vals(self, gateway, author_id, update):
         for contact in update.get("contacts", []):
