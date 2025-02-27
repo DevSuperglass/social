@@ -84,34 +84,6 @@ class MailGatewayWhatsappService(models.AbstractModel):
                             continue
                         self._process_button(message.get("button", {}).get("payload"), message)
 
-    def _get_crm_meta(self, number):
-        change_status = self.env['crm.lead'].sudo().search(
-            [('mobile', '=', number), ('new_status', '=', 'draft')])
-
-        if change_status:
-            change_status.new_status = 'in_progress'
-            change_status.remove_button = True
-
-    def _process_button(self, button_template, message):
-        parent_id = self._get_parent_message(message)
-        if button_template:
-            button_record = request.env['whatsapp.template.button'].sudo().search(
-                [('name', '=', button_template), ('whatsapp_template_id', '=',
-                                                  request.env['whatsapp.template.waid'].sudo().search(
-                                                      [('mail_message_id', '=', parent_id)]).whatsapp_template_id.id)])
-            if button_record.code:
-                model = button_record.env[button_record.model_id.model].with_context(
-                    button=button_template,
-                    waid=message.get('context', {}).get('id')
-                )
-                function_to_call = getattr(model, button_record.code, None)
-                if callable(function_to_call):
-                    function_to_call()
-                else:
-                    return False
-            else:
-                _logger.warning("Button template not found")
-
     @staticmethod
     def convert_audio(content):
         ogg_audio = AudioSegment.from_file(BytesIO(content), format="ogg")
@@ -194,6 +166,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
             pass
         if len(body) > 0 or attachments:
             author = self._get_author(chat.gateway_id, value)
+            if not chat.route_id and author.route_id:
+                chat.write({'route_id': author.route_id.id})
             new_message = chat.message_post(
                 body=body,
                 author_id=author and author._name == "res.partner" and author.id,
@@ -207,6 +181,34 @@ class MailGatewayWhatsappService(models.AbstractModel):
             )
             self._post_process_message(new_message, chat)
             return new_message
+
+    def _get_crm_meta(self, number):
+        change_status = self.env['crm.lead'].sudo().search(
+            [('mobile', '=', number), ('new_status', '=', 'draft')])
+
+        if change_status:
+            change_status.new_status = 'in_progress'
+            change_status.remove_button = True
+
+    def _process_button(self, button_template, message):
+        parent_id = self._get_parent_message(message)
+        if button_template:
+            button_record = request.env['whatsapp.template.button'].sudo().search(
+                [('name', '=', button_template), ('whatsapp_template_id', '=',
+                                                  request.env['whatsapp.template.waid'].sudo().search(
+                                                      [('mail_message_id', '=', parent_id)]).whatsapp_template_id.id)])
+            if button_record.code:
+                model = button_record.env[button_record.model_id.model].with_context(
+                    button=button_template,
+                    waid=message.get('context', {}).get('id')
+                )
+                function_to_call = getattr(model, button_record.code, None)
+                if callable(function_to_call):
+                    function_to_call()
+                else:
+                    return False
+            else:
+                _logger.warning("Button template not found")
 
     def _send(
         self,
