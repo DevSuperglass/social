@@ -161,6 +161,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
             pass
         if len(body) > 0 or attachments:
             author = self._get_author(chat.gateway_id, value)
+            if not chat.route_id and author.route_id:
+                chat.write({'route_id': author.route_id.id})
             new_message = chat.with_context(
                 {'no_auto_pin': self.is_no_pin_message(message=message) and not chat.queue_id,
                  'no_gateway_notification': True}
