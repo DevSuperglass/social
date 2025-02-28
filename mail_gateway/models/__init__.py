@@ -1,3 +1,4 @@
+from . import mail_message_gateway_link_abstract
 from . import mail_message
 from . import mail_notification
 from . import mail_channel
