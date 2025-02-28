@@ -25,24 +25,6 @@ registerPatch({
                 });
                 return;
             }
-            if (
-                this.messageAction.messageActionListOwner ===
-                this.messageAction.messageActionListOwnerAsAddToThread
-            ) {
-                ev.stopPropagation();
-                this.env.services.action.doAction({
-                    name: this.env._t("Link Message to thread"),
-                    type: "ir.actions.act_window",
-                    res_model: "mail.message.gateway.link",
-                    context: {
-                        default_message_id:
-                            this.messageAction.messageActionListOwner.message.id,
-                    },
-                    views: [[false, "form"]],
-                    target: "new",
-                });
-                return;
-            }
             return this._super(...arguments);
         },
     },
@@ -54,12 +36,6 @@ registerPatch({
                     this.messageAction.messageActionListOwnerAsSendGateway
                 ) {
                     return this.env._t("Send with gateway");
-                }
-                if (
-                    this.messageAction.messageActionListOwner ===
-                    this.messageAction.messageActionListOwnerAsAddToThread
-                ) {
-                    return this.env._t("Link to thread");
                 }
                 return this._super();
             },
@@ -73,15 +49,6 @@ registerPatch({
                     return (
                         this.paddingClassNames +
                         " fa fa-lg fa-share-square-o o_MessageActionView_actionSendGateway"
-                    );
-                }
-                if (
-                    this.messageAction.messageActionListOwner ===
-                    this.messageAction.messageActionListOwnerAsAddToThread
-                ) {
-                    return (
-                        this.paddingClassNames +
-                        " fa fa-lg fa-link o_MessageActionView_actionAddToThread"
                     );
                 }
                 return this._super();
