@@ -35,15 +35,6 @@ class MailGateway(models.Model):
         "res.company", default=lambda self: self.env.company.id
     )
 
-    _sql_constraints = [
-        ("mail_gateway_token", "unique(token)", "Token must be unique"),
-        (
-            "mail_gateway_webhook_key",
-            "unique(webhook_key)",
-            "Webhook Key must be unique",
-        ),
-    ]
-
     @api.depends("webhook_key")
     def _compute_webhook_url(self):
         for record in self:

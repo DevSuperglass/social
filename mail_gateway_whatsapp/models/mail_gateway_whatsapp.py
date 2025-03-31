@@ -52,11 +52,10 @@ class MailGatewayWhatsappService(models.AbstractModel):
             % hmac.new(
             bot_data["webhook_secret"].encode(),
             request.httprequest.data,
-            hashlib.sha256,
-        ).hexdigest()
+            hashlib.sha256, ).hexdigest()
             != signature
         ):
-            return True
+            return False
         return True
 
     def _get_channel_vals(self, gateway, token, update):
@@ -84,34 +83,6 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         if message.get("type") != "button":
                             continue
                         self._process_button(message.get("button", {}).get("payload"), message)
-
-    def _get_crm_meta(self, number):
-        change_status = self.env['crm.lead'].sudo().search(
-            [('mobile', '=', number), ('new_status', '=', 'draft')])
-
-        if change_status:
-            change_status.new_status = 'in_progress'
-            change_status.remove_button = True
-
-    def _process_button(self, button_template, message):
-        parent_id = self._get_parent_message(message)
-        if button_template:
-            button_record = request.env['whatsapp.template.button'].sudo().search(
-                [('name', '=', button_template), ('whatsapp_template_id', '=',
-                                                  request.env['whatsapp.template.waid'].sudo().search(
-                                                      [('mail_message_id', '=', parent_id)]).whatsapp_template_id.id)])
-            if button_record.code:
-                model = button_record.env[button_record.model_id.model].with_context(
-                    button=button_template,
-                    waid=message.get('context', {}).get('id')
-                )
-                function_to_call = getattr(model, button_record.code, None)
-                if callable(function_to_call):
-                    function_to_call()
-                else:
-                    return False
-            else:
-                _logger.warning("Button template not found")
 
     @staticmethod
     def convert_audio(content):
@@ -195,6 +166,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
             pass
         if len(body) > 0 or attachments:
             author = self._get_author(chat.gateway_id, value)
+            if not chat.route_id and author.route_id:
+                chat.write({'route_id': author.route_id.id})
             new_message = chat.message_post(
                 body=body,
                 author_id=author and author._name == "res.partner" and author.id,
@@ -208,6 +181,34 @@ class MailGatewayWhatsappService(models.AbstractModel):
             )
             self._post_process_message(new_message, chat)
             return new_message
+
+    def _get_crm_meta(self, number):
+        change_status = self.env['crm.lead'].sudo().search(
+            [('mobile', '=', number), ('new_status', '=', 'draft')])
+
+        if change_status:
+            change_status.new_status = 'in_progress'
+            change_status.remove_button = True
+
+    def _process_button(self, button_template, message):
+        parent_id = self._get_parent_message(message)
+        if button_template:
+            button_record = request.env['whatsapp.template.button'].sudo().search(
+                [('name', '=', button_template), ('whatsapp_template_id', '=',
+                                                  request.env['whatsapp.template.waid'].sudo().search(
+                                                      [('mail_message_id', '=', parent_id)]).whatsapp_template_id.id)])
+            if button_record.code:
+                model = button_record.env[button_record.model_id.model].with_context(
+                    button=button_template,
+                    waid=message.get('context', {}).get('id')
+                )
+                function_to_call = getattr(model, button_record.code, None)
+                if callable(function_to_call):
+                    function_to_call()
+                else:
+                    return False
+            else:
+                _logger.warning("Button template not found")
 
     def _send(
         self,
@@ -428,14 +429,16 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
     def _get_partner(self, update):
         number = update.get("messages")[0].get("from")
-        if not request.env['res.partner'].sudo().search([('phone_sanitized', '=', "+" + number)]):
+        partner_id = request.env['res.partner'].sudo().search([('phone_sanitized', '=', "+" + number)])
+        if not partner_id:
             vals_list = {
                 'name': update['contacts'][0]['profile']['name'],
             }
 
             vals_list.update({'phone': number, 'whatsapp_contact': 'phone'}) if len(number) == 12 else vals_list.update(
                 {'mobile': number, 'whatsapp_contact': 'mobile'})
-            return request.env['res.partner'].sudo().create(vals_list)
+            partner_id = request.env['res.partner'].sudo().create(vals_list)
+        return partner_id
 
     def _get_author_vals(self, gateway, author_id, update):
         for contact in update.get("contacts", []):
@@ -456,10 +459,11 @@ class MailGatewayWhatsappService(models.AbstractModel):
         tmpl_id = self.env['whatsapp.template'].search([('name', '=', tmpl_name)], limit=1)
 
         for mobile in mobile_list:
-            message = self.create_message(mobile, body_message)
+            message = self.create_message(mobile, body_message, gateway)
             if not message:
                 raise UserError(
-                    f'O número de telefone {mobile} não é válido. Para realizar o envio, utilize o seguinte formato: 55DDD(9)Telefone. Exemplo: 5511912345678.')
+                    f'O número de telefone {mobile} não é válido. Para realizar o envio, utilize o seguinte formato: 55DDD(9)Telefone. Exemplo: 5511912345678.'
+                )
 
             json = {
                 'messaging_product': 'whatsapp',
@@ -495,10 +499,10 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'mail_message_id': message.id,
             })
 
-    def create_message(self, mobile, body_message):
+    def create_message(self, mobile, body_message, gateway_id):
         channel = self.env['mail.channel'].search([
             ('gateway_channel_token', '=', mobile),
-            ('channel_type', '=', 'gateway')
+            ('gateway_id', '=', gateway_id.id)
         ], limit=1)
 
         if channel:
