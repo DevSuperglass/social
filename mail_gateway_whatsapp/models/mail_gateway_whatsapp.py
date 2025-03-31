@@ -429,7 +429,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
     def _get_partner(self, update):
         number = update.get("messages")[0].get("from")
-        partner_id = request.env['res.partner'].sudo().search([('phone_sanitized', '=', "+" + number)])
+        partner_id = request.env['res.partner'].sudo().search([('phone_sanitized', '=', "+" + number)], limit=1)
         if not partner_id:
             vals_list = {
                 'name': update['contacts'][0]['profile']['name'],
