@@ -398,7 +398,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 [
                     ("gateway_id", "=", gateway.id),
                     ("gateway_token", "=", str(author_id)),
-                ]
+                ], limit=1
             )
             if gateway_partner:
                 return gateway_partner.partner_id
