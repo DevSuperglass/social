@@ -79,7 +79,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         if not chat:
                             continue
                         message_id = self._process_update(chat, message, change["value"])
-                        self._set_queue(chat, message_id, message)
+                        self._set_queue(chat, message_id)
                         self._get_crm_meta(message.get("from"))
                         if message.get("type") != "button":
                             continue
@@ -169,10 +169,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             author = self._get_author(chat.gateway_id, value)
             if not chat.route_id and author.route_id:
                 chat.write({'route_id': author.route_id.id})
-            new_message = chat.with_context(
-                {'no_auto_pin': self.is_no_pin_message(message=message) and not chat.queue_id,
-                 'no_gateway_notification': True}
-            ).message_post(
+            new_message = chat.with_context({'no_gateway_notification': True}).message_post(
                 body=body,
                 author_id=author and author._name == "res.partner" and author.id,
                 gateway_type="whatsapp",
@@ -186,24 +183,28 @@ class MailGatewayWhatsappService(models.AbstractModel):
             self._post_process_message(new_message, chat)
             return new_message
 
-    def _set_queue(self, channel_id, message_id, message):
+    def _set_queue(self, channel_id, message_id):
         """
             Criação de atendimento.
         """
 
-        if not channel_id.queue_id and not self.is_no_pin_message(
-            message=message
-        ) and channel_id.gateway_id.whatsapp_from_phone == '335789752960181':
+        if not channel_id.queue_id and channel_id.gateway_id.whatsapp_from_phone == '335789752960181':
             partner_id = self.env['res.partner.gateway.channel'].search(
-                [('gateway_token', '=', channel_id.gateway_channel_token)]).partner_id
-            channel_id.write({'queue_id': self.env['quotation.queue'].sudo().create(
-                {'channel_id': channel_id.id,
-                 'partner_id': partner_id.id,
-                 'initial_date': datetime.now(),
-                 'start_message_id': message_id.id,
-                 'quotation_id': message_id.gateway_message_id.res_id
-                 if message_id.gateway_message_id.model == 'quotation' else False}).id,
-                              'queue_priority': int(partner_id.priority_rating)})
+                [
+                    ('gateway_token', '=', channel_id.gateway_channel_token)
+                ]
+            ).partner_id
+            channel_id.write({
+                'queue_id': self.env['quotation.queue'].sudo().create({
+                    'channel_id': channel_id.id,
+                    'partner_id': partner_id.id,
+                    'initial_date': datetime.now(),
+                    'start_message_id': message_id.id,
+                    'quotation_id': message_id.gateway_message_id.res_id
+                    if message_id.gateway_message_id.model == 'quotation' else False
+                }).id,
+                'queue_priority': int(partner_id.priority_rating)
+            })
             self._send_attendance_start(mobile=channel_id.gateway_channel_token)
 
     @staticmethod
