@@ -549,7 +549,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
         if channel:
             message = channel.with_context({
                 'no_gateway_notification': True,
-                'no_auto_pin': self._context.get('no_auto_pin') and not channel.queue_id
+                'no_auto_pin': not channel.queue_id
             }).message_post(
                 body=body_message,
                 author_id=2 if self.env.context.get('is_internal') else self.env['res.users'].browse(
