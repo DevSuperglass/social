@@ -42,17 +42,16 @@ class MailGateway(models.Model):
             record.webhook_url = record._get_webhook_url()
 
     def _get_channel_id(self, chat_token):
-        return (
-            self.env["mail.channel"]
-            .search(
-                [
-                    ("gateway_channel_token", "=", str(chat_token)),
-                    ("gateway_id", "=", self.id),
-                ],
-                limit=1,
-            )
-            .id
-        )
+        self.env['mail.gateway'].flush_model()
+        self.env['mail.channel'].flush_model()
+        self.env['mail.gateway.abstract'].flush_model()
+        self.env['mail.message'].flush_model()
+        self.env['mail.gateway.whatsapp'].flush_model()
+        sql = f"SELECT id FROM mail_channel WHERE gateway_channel_token = '{chat_token}' AND gateway_id = {self.id} "
+        self.env.cr.execute(sql)
+        id = self.env.cr.fetchone()
+        id = id[0] if id else False
+        return (id)
 
     def _get_webhook_url(self):
         return "%s/gateway/%s/%s/update" % (

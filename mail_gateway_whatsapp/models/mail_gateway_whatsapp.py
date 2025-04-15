@@ -79,7 +79,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         if not chat:
                             continue
                         message_id = self._process_update(chat, message, change["value"])
-                        self._set_queue(chat, message_id)
+                        if message_id:
+                            self._set_queue(chat, message_id, message)
                         self._get_crm_meta(message.get("from"))
                         if message.get("type") != "button":
                             continue
