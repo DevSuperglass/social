@@ -183,7 +183,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
             )
             self._post_process_message(new_message, chat)
             return new_message
-
+        else:
+            _logger.warning("JSON DA MENSAGEM VAZIA: " + message)
+            return
     def _set_queue(self, channel_id, message_id):
         """
             Criação de atendimento.
