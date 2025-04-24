@@ -186,6 +186,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
         else:
             _logger.warning("JSON DA MENSAGEM VAZIA: " + str(message))
             return
+
     def _set_queue(self, channel_id, message_id):
         """
             Criação de atendimento.
@@ -475,15 +476,22 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
     def _get_partner(self, update):
         number = update.get("messages")[0].get("from")
-        partner_id = request.env['res.partner'].sudo().search([('phone_sanitized', '=', "+" + number)])
+        partner_id = self.env['res.partner'].search(
+            [
+                ('phone_sanitized', '=', "+" + number)
+            ]
+        )
         if not partner_id:
             vals_list = {
                 'name': update['contacts'][0]['profile']['name'],
             }
 
-            vals_list.update({'phone': number, 'whatsapp_contact': 'phone'}) if len(number) == 12 else vals_list.update(
-                {'mobile': number, 'whatsapp_contact': 'mobile'})
-            partner_id = request.env['res.partner'].sudo().create(vals_list)
+            vals_list.update(
+                {'phone': number, 'whatsapp_contact': 'phone'}
+            ) if len(number) == 12 else vals_list.update(
+                {'mobile': number, 'whatsapp_contact': 'mobile'}
+            )
+            partner_id = self.env['res.partner'].create(vals_list)
         return partner_id
 
     def _get_author_vals(self, gateway, author_id, update):
