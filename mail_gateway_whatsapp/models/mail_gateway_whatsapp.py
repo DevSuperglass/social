@@ -192,7 +192,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
             partner_id = self.env['res.partner.gateway.channel'].search(
                 [
                     ('gateway_token', '=', channel_id.gateway_channel_token)
-                ]
+                ],
+                limit=1
             ).partner_id
             channel_id.write({
                 'queue_id': self.env['quotation.queue'].sudo().create({
