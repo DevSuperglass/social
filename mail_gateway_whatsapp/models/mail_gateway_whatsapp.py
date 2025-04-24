@@ -79,7 +79,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         if not chat:
                             continue
                         message_id = self._process_update(chat, message, change["value"])
-                        self._set_queue(chat, message_id)
+                        if message_id:
+                            self._set_queue(chat, message_id)
                         self._get_crm_meta(message.get("from"))
                         if message.get("type") != "button":
                             continue
@@ -182,7 +183,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
             )
             self._post_process_message(new_message, chat)
             return new_message
-
+        else:
+            _logger.warning("JSON DA MENSAGEM VAZIA: " + str(message))
+            return
     def _set_queue(self, channel_id, message_id):
         """
             Criação de atendimento.
