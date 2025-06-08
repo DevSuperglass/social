@@ -78,7 +78,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         )
                         if not chat:
                             continue
-                        self._process_update(chat, message, change["value"])
+                        message_id = self._process_update(chat, message, change["value"])
+                        if message_id:
+                            self._set_queue(chat, message_id)
                         self._get_crm_meta(message.get("from"))
                         if message.get("type") != "button":
                             continue
@@ -168,7 +170,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             author = self._get_author(chat.gateway_id, value)
             if not chat.route_id and author.route_id:
                 chat.write({'route_id': author.route_id.id})
-            new_message = chat.message_post(
+            new_message = chat.with_context({'no_gateway_notification': True}).message_post(
                 body=body,
                 author_id=author and author._name == "res.partner" and author.id,
                 gateway_type="whatsapp",
@@ -181,6 +183,50 @@ class MailGatewayWhatsappService(models.AbstractModel):
             )
             self._post_process_message(new_message, chat)
             return new_message
+        else:
+            _logger.warning("JSON DA MENSAGEM VAZIA: " + str(message))
+            return
+
+    def _set_queue(self, channel_id, message_id):
+        """
+            Criação de atendimento.
+        """
+
+        if not channel_id.queue_id and channel_id.gateway_id.whatsapp_from_phone == '335789752960181':
+            partner_id = self.env['res.partner.gateway.channel'].search(
+                [
+                    ('gateway_token', '=', channel_id.gateway_channel_token)
+                ],
+                limit=1
+            ).partner_id
+            channel_id.write({
+                'queue_id': self.env['quotation.queue'].sudo().create({
+                    'channel_id': channel_id.id,
+                    'partner_id': partner_id.id,
+                    'initial_date': datetime.now(),
+                    'start_message_id': message_id.id,
+                    'quotation_id': message_id.gateway_message_id.res_id
+                    if message_id.gateway_message_id.model == 'quotation' else False
+                }).id,
+                'queue_priority': int(partner_id.priority_rating)
+            })
+            self._send_attendance_start(mobile=channel_id.gateway_channel_token)
+
+    @staticmethod
+    def is_no_pin_message(message):
+        body = message.get('button', {}).get('text')
+
+        if body in ['CONFIRMAR', 'DESISTIR']:
+            return True
+        return False
+
+    def _send_attendance_start(self, mobile):
+        self.with_context({'is_internal': True})._send_tmpl_message(tmpl_name=None,
+                                                                    gateway_phone='335789752960181',
+                                                                    components="Seu atendimento será iniciado em breve",
+                                                                    mobile_list=[mobile],
+                                                                    body_message="Seu atendimento será iniciado em breve"
+                                                                    )
 
     def _get_crm_meta(self, number):
         change_status = self.env['crm.lead'].sudo().search(
@@ -398,7 +444,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 [
                     ("gateway_id", "=", gateway.id),
                     ("gateway_token", "=", str(author_id)),
-                ], limit=1
+                ],
+                limit=1
             )
             if gateway_partner:
                 return gateway_partner.partner_id
@@ -429,15 +476,22 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
     def _get_partner(self, update):
         number = update.get("messages")[0].get("from")
-        partner_id = request.env['res.partner'].sudo().search([('phone_sanitized', '=', "+" + number)], limit=1)
+        partner_id = self.env['res.partner'].search(
+            [
+                ('phone_sanitized', '=', "+" + number)
+            ]
+        )
         if not partner_id:
             vals_list = {
                 'name': update['contacts'][0]['profile']['name'],
             }
 
-            vals_list.update({'phone': number, 'whatsapp_contact': 'phone'}) if len(number) == 12 else vals_list.update(
-                {'mobile': number, 'whatsapp_contact': 'mobile'})
-            partner_id = request.env['res.partner'].sudo().create(vals_list)
+            vals_list.update(
+                {'phone': number, 'whatsapp_contact': 'phone'}
+            ) if len(number) == 12 else vals_list.update(
+                {'mobile': number, 'whatsapp_contact': 'mobile'}
+            )
+            partner_id = self.env['res.partner'].create(vals_list)
         return partner_id
 
     def _get_author_vals(self, gateway, author_id, update):
@@ -462,8 +516,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             message = self.create_message(mobile, body_message, gateway)
             if not message:
                 raise UserError(
-                    f'O número de telefone {mobile} não é válido. Para realizar o envio, utilize o seguinte formato: 55DDD(9)Telefone. Exemplo: 5511912345678.'
-                )
+                    f'O número de telefone {mobile} não é válido. Para realizar o envio, utilize o seguinte formato: 55DDD(9)Telefone. Exemplo: 5511912345678.')
 
             json = {
                 'messaging_product': 'whatsapp',
@@ -506,7 +559,10 @@ class MailGatewayWhatsappService(models.AbstractModel):
         ], limit=1)
 
         if channel:
-            message = channel.with_context({'no_gateway_notification': True}).message_post(
+            message = channel.with_context({
+                'no_gateway_notification': True,
+                'no_auto_pin': not channel.queue_id
+            }).message_post(
                 body=body_message,
                 author_id=2 if self.env.context.get('is_internal') else self.env['res.users'].browse(
                     self.env.uid).partner_id.id,
