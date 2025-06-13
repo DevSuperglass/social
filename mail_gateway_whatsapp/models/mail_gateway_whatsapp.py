@@ -50,9 +50,10 @@ class MailGatewayWhatsappService(models.AbstractModel):
         if (
             "sha256=%s"
             % hmac.new(
-            bot_data["webhook_secret"].encode(),
-            request.httprequest.data,
-            hashlib.sha256, ).hexdigest()
+                bot_data["webhook_secret"].encode(),
+                request.httprequest.data,
+                hashlib.sha256,
+            ).hexdigest()
             != signature
         ):
             return False
@@ -78,13 +79,17 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         )
                         if not chat:
                             continue
-                        message_id = self._process_update(chat, message, change["value"])
+                        message_id = self._process_update(
+                            chat, message, change["value"]
+                        )
                         if message_id:
                             self._set_queue(chat, message_id)
                         self._get_crm_meta(message.get("from"))
                         if message.get("type") != "button":
                             continue
-                        self._process_button(message.get("button", {}).get("payload"), message)
+                        self._process_button(
+                            message.get("button", {}).get("payload"), message
+                        )
 
     @staticmethod
     def convert_audio(content):
@@ -104,9 +109,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
         if message.get("text"):
             body = message.get("text").get("body")
         if message.get("payload_text"):
-            body = message['payload_text']
-        if message.get("type") == 'button':
-            body = message.get('button').get('text')
+            body = message["payload_text"]
+        if message.get("type") == "button":
+            body = message.get("button").get("text")
         for key in ["image", "audio", "video", "document", "sticker"]:
             if message.get(key):
                 image_id = message.get(key).get("id")
@@ -142,8 +147,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
                 converted_audio = None
 
-                if key == 'audio':
-                    image_info['mime_type'] = 'audio/mpeg'
+                if key == "audio":
+                    image_info["mime_type"] = "audio/mpeg"
                     converted_audio = self.convert_audio(content=image_request.content)
 
                 attachments.append(
@@ -152,7 +157,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                             image_id,
                             mimetypes.guess_extension(image_info["mime_type"]),
                         ),
-                        image_request.content if key != 'audio' else converted_audio,
+                        image_request.content if key != "audio" else converted_audio,
                     )
                 )
         if message.get("location"):
@@ -169,8 +174,10 @@ class MailGatewayWhatsappService(models.AbstractModel):
         if len(body) > 0 or attachments:
             author = self._get_author(chat.gateway_id, value)
             if not chat.route_id and author.route_id:
-                chat.write({'route_id': author.route_id.id})
-            new_message = chat.with_context({'no_gateway_notification': True}).message_post(
+                chat.write({"route_id": author.route_id.id})
+            new_message = chat.with_context(
+                {"no_gateway_notification": True}
+            ).message_post(
                 body=body,
                 author_id=author and author._name == "res.partner" and author.id,
                 gateway_type="whatsapp",
@@ -179,7 +186,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 message_type="comment",
                 attachments=attachments,
                 parent_id=self._get_parent_message(message),
-                whatsapp_id=message.get("id")
+                whatsapp_id=message.get("id"),
             )
             self._post_process_message(new_message, chat)
             return new_message
@@ -189,65 +196,96 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
     def _set_queue(self, channel_id, message_id):
         """
-            Criação de atendimento.
+        Criação de atendimento.
         """
 
-        if not channel_id.queue_id and channel_id.gateway_id.whatsapp_from_phone == '335789752960181':
-            partner_id = self.env['res.partner.gateway.channel'].search(
-                [
-                    ('gateway_token', '=', channel_id.gateway_channel_token)
-                ],
-                limit=1
-            ).partner_id
-            channel_id.write({
-                'queue_id': self.env['quotation.queue'].sudo().create({
-                    'channel_id': channel_id.id,
-                    'partner_id': partner_id.id,
-                    'initial_date': datetime.now(),
-                    'start_message_id': message_id.id,
-                    'quotation_id': message_id.gateway_message_id.res_id
-                    if message_id.gateway_message_id.model == 'quotation' else False
-                }).id,
-                'queue_priority': int(partner_id.priority_rating)
-            })
+        if (
+            not channel_id.queue_id
+            and channel_id.gateway_id.whatsapp_from_phone == "335789752960181"
+        ):
+            partner_id = (
+                self.env["res.partner.gateway.channel"]
+                .search(
+                    [("gateway_token", "=", channel_id.gateway_channel_token)], limit=1
+                )
+                .partner_id
+            )
+            channel_id.write(
+                {
+                    "queue_id": self.env["quotation.queue"]
+                    .sudo()
+                    .create(
+                        {
+                            "channel_id": channel_id.id,
+                            "partner_id": partner_id.id,
+                            "initial_date": datetime.now(),
+                            "start_message_id": message_id.id,
+                            "quotation_id": message_id.gateway_message_id.res_id
+                            if message_id.gateway_message_id.model == "quotation"
+                            else False,
+                        }
+                    )
+                    .id,
+                    "queue_priority": int(partner_id.priority_rating),
+                }
+            )
             self._send_attendance_start(mobile=channel_id.gateway_channel_token)
 
     @staticmethod
     def is_no_pin_message(message):
-        body = message.get('button', {}).get('text')
+        body = message.get("button", {}).get("text")
 
-        if body in ['CONFIRMAR', 'DESISTIR']:
+        if body in ["CONFIRMAR", "DESISTIR"]:
             return True
         return False
 
     def _send_attendance_start(self, mobile):
-        self.with_context({'is_internal': True})._send_tmpl_message(tmpl_name=None,
-                                                                    gateway_phone='335789752960181',
-                                                                    components="Seu atendimento será iniciado em breve",
-                                                                    mobile_list=[mobile],
-                                                                    body_message="Seu atendimento será iniciado em breve"
-                                                                    )
+        self.with_context({"is_internal": True})._send_tmpl_message(
+            tmpl_name=None,
+            gateway_phone="335789752960181",
+            components="Seu atendimento será iniciado em breve",
+            mobile_list=[mobile],
+            body_message="Seu atendimento será iniciado em breve",
+        )
 
     def _get_crm_meta(self, number):
-        change_status = self.env['crm.lead'].sudo().search(
-            [('mobile', '=', number), ('new_status', '=', 'draft')])
+        change_status = (
+            self.env["crm.lead"]
+            .sudo()
+            .search([("mobile", "=", number), ("new_status", "=", "draft")])
+        )
 
         if change_status:
-            change_status.new_status = 'in_progress'
+            change_status.new_status = "in_progress"
             change_status.remove_button = True
 
     def _process_button(self, button_template, message):
         parent_id = self._get_parent_message(message)
         try:
             if button_template:
-                button_record = request.env['whatsapp.template.button'].sudo().search(
-                    [('name', '=', button_template), ('whatsapp_template_id', '=',
-                                                    request.env['whatsapp.template.waid'].sudo().search(
-                                                        [('mail_message_id', '=', parent_id)]).whatsapp_template_id.id)])
+                button_record = (
+                    request.env["whatsapp.template.button"]
+                    .sudo()
+                    .search(
+                        [
+                            ("name", "=", button_template),
+                            (
+                                "whatsapp_template_id",
+                                "=",
+                                request.env["whatsapp.template.waid"]
+                                .sudo()
+                                .search([("mail_message_id", "=", parent_id)])
+                                .whatsapp_template_id.id,
+                            ),
+                        ]
+                    )
+                )
                 if button_record.code:
-                    model = button_record.env[button_record.model_id.model].with_context(
+                    model = button_record.env[
+                        button_record.model_id.model
+                    ].with_context(
                         button=button_template,
-                        waid=message.get('context', {}).get('id')
+                        waid=message.get("context", {}).get("id"),
                     )
                     function_to_call = getattr(model, button_record.code, None)
                     if callable(function_to_call):
@@ -257,8 +295,10 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 else:
                     _logger.warning("Button template not found")
         except Exception as e:
-            _logger.error("Erro processando o template: %s erro: %s ", str(message), str(e))
-            
+            _logger.error(
+                "Erro processando o template: %s erro: %s ", str(message), str(e)
+            )
+
     def _send(
         self,
         gateway,
@@ -304,7 +344,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
                 url = "https://graph.facebook.com/v%s/%s/messages" % (
                     gateway.whatsapp_version,
-                    gateway.whatsapp_from_phone)
+                    gateway.whatsapp_from_phone,
+                )
                 headers = {"Authorization": "Bearer %s" % gateway.token}
                 json = self._send_payload(
                     record.gateway_channel_id,
@@ -312,7 +353,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     media_type=attachment_type,
                     media_name=attachment.name,
                 )
-                message = self._create_request_line(url=url, headers=headers, json=json, record=record)
+                message = self._create_request_line(
+                    url=url, headers=headers, json=json, record=record
+                )
 
             body = self._get_message_body(record)
             if body:
@@ -324,7 +367,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 )
                 headers = {"Authorization": "Bearer %s" % gateway.token}
                 json = self._send_payload(record.gateway_channel_id, body=body)
-                message = self._create_request_line(url=url, headers=headers, json=json, record=record)
+                message = self._create_request_line(
+                    url=url, headers=headers, json=json, record=record
+                )
         except Exception as exc:
             buff = StringIO()
             traceback.print_exc(file=buff)
@@ -354,8 +399,18 @@ class MailGatewayWhatsappService(models.AbstractModel):
             self.env.cr.commit()
 
     def _create_request_line(self, url, headers, json, record):
-        return self.env['whatsapp.request'].sudo().create(
-            {'url': url, 'headers': headers, 'json': json, 'mail_message_id': record.mail_message_id.id})
+        return (
+            self.env["whatsapp.request"]
+            .sudo()
+            .create(
+                {
+                    "url": url,
+                    "headers": headers,
+                    "json": json,
+                    "mail_message_id": record.mail_message_id.id,
+                }
+            )
+        )
 
     def _send_payload(
         self, channel, body=False, media_id=False, media_type=False, media_name=False
@@ -370,45 +425,50 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
         if body:
             formated_body = re.sub(r"\*.*\*", "", body).strip()
-            last_message = self.env['mail.message'].search([
-                ('model', '=', 'mail.channel'),
-                ('res_id', '=', channel.id)
-            ], order='create_date desc', limit=1)
+            last_message = self.env["mail.message"].search(
+                [("model", "=", "mail.channel"), ("res_id", "=", channel.id)],
+                order="create_date desc",
+                limit=1,
+            )
 
             last_message_body = str(last_message.body)
 
             if last_message_body == formated_body:
                 if last_message.parent_id:
                     context_data = {
-                        "context": {
-                            "message_id": last_message.parent_id.whatsapp_id
-                        }
+                        "context": {"message_id": last_message.parent_id.whatsapp_id}
                     }
             else:
-                message_body = self.env['mail.message'].search([
-                    ('model', '=', 'mail.channel'),
-                    ('res_id', '=', channel.id),
-                    ('body', '=', formated_body)
-                ], order='create_date desc', limit=1)
+                message_body = self.env["mail.message"].search(
+                    [
+                        ("model", "=", "mail.channel"),
+                        ("res_id", "=", channel.id),
+                        ("body", "=", formated_body),
+                    ],
+                    order="create_date desc",
+                    limit=1,
+                )
                 if message_body.parent_id:
                     context_data = {
-                        "context": {
-                            "message_id": message_body.parent_id.whatsapp_id
-                        }
+                        "context": {"message_id": message_body.parent_id.whatsapp_id}
                     }
-            payload.update({
-                "type": "text",
-                "text": {"preview_url": False, "body": html2plaintext(body)},
-            })
+            payload.update(
+                {
+                    "type": "text",
+                    "text": {"preview_url": False, "body": html2plaintext(body)},
+                }
+            )
 
         if media_id:
             media_data = {"id": media_id}
             if media_type == "document":
                 media_data["filename"] = media_name
-            payload.update({
-                "type": media_type,
-                media_type: media_data,
-            })
+            payload.update(
+                {
+                    "type": media_type,
+                    media_type: media_data,
+                }
+            )
 
         if context_data:
             payload.update(context_data)
@@ -448,7 +508,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     ("gateway_id", "=", gateway.id),
                     ("gateway_token", "=", str(author_id)),
                 ],
-                limit=1
+                limit=1,
             )
             if gateway_partner:
                 return gateway_partner.partner_id
@@ -479,22 +539,20 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
     def _get_partner(self, update):
         number = update.get("messages")[0].get("from")
-        partner_id = self.env['res.partner'].search(
-            [
-                ('phone_sanitized', '=', "+" + number)
-            ]
+        partner_id = self.env["res.partner"].search(
+            [("phone_sanitized", "=", "+" + number)]
         )
         if not partner_id:
             vals_list = {
-                'name': update['contacts'][0]['profile']['name'],
+                "name": update["contacts"][0]["profile"]["name"],
             }
 
-            vals_list.update(
-                {'phone': number, 'whatsapp_contact': 'phone'}
-            ) if len(number) == 12 else vals_list.update(
-                {'mobile': number, 'whatsapp_contact': 'mobile'}
+            vals_list.update({"phone": number, "whatsapp_contact": "phone"}) if len(
+                number
+            ) == 12 else vals_list.update(
+                {"mobile": number, "whatsapp_contact": "mobile"}
             )
-            partner_id = self.env['res.partner'].create(vals_list)
+            partner_id = self.env["res.partner"].create(vals_list)
         return partner_id
 
     def _get_author_vals(self, gateway, author_id, update):
@@ -511,64 +569,79 @@ class MailGatewayWhatsappService(models.AbstractModel):
         # By default, it does nothing.
         return {}
 
-    def _send_tmpl_message(self, gateway_phone, tmpl_name, components, mobile_list, body_message):
-        gateway = self.env['mail.gateway'].search([('whatsapp_from_phone', '=', gateway_phone)], limit=1)
-        tmpl_id = self.env['whatsapp.template'].search([('name', '=', tmpl_name)], limit=1)
+    def _send_tmpl_message(
+        self, gateway_phone, tmpl_name, components, mobile_list, body_message
+    ):
+        gateway = self.env["mail.gateway"].search(
+            [("whatsapp_from_phone", "=", gateway_phone)], limit=1
+        )
+        tmpl_id = self.env["whatsapp.template"].search(
+            [("name", "=", tmpl_name)], limit=1
+        )
 
         for mobile in mobile_list:
             message = self.create_message(mobile, body_message, gateway)
             if not message:
                 raise UserError(
-                    f'O número de telefone {mobile} não é válido. Para realizar o envio, utilize o seguinte formato: 55DDD(9)Telefone. Exemplo: 5511912345678.')
+                    f"O número de telefone {mobile} não é válido. Para realizar o envio, utilize o seguinte formato: 55DDD(9)Telefone. Exemplo: 5511912345678."
+                )
 
             json = {
-                'messaging_product': 'whatsapp',
-                'recipient_type': 'individual',
-                'to': mobile,
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": mobile,
             }
 
             if tmpl_id:
-                json.update({'type': 'template',
-                             'template': {
-                                 'name': tmpl_id.template_name,
-                                 'language': {'code': tmpl_id.lang_code},
-                                 'components': components
-                             }})
-                self.env['whatsapp.template.waid'].sudo().create({
-                    'whatsapp_template_id': tmpl_id.id,
-                    'body': body_message,
-                    'mail_message_id': message.id
-                })
+                json.update(
+                    {
+                        "type": "template",
+                        "template": {
+                            "name": tmpl_id.template_name,
+                            "language": {"code": tmpl_id.lang_code},
+                            "components": components,
+                        },
+                    }
+                )
+                self.env["whatsapp.template.waid"].sudo().create(
+                    {
+                        "whatsapp_template_id": tmpl_id.id,
+                        "body": body_message,
+                        "mail_message_id": message.id,
+                    }
+                )
             else:
-                json.update({"type": 'text',
-                             "text": {
-                                 "body": components
-                             }})
+                json.update({"type": "text", "text": {"body": components}})
 
-            self.env['whatsapp.request'].sudo().create({
-                'url': f'https://graph.facebook.com/v{gateway.whatsapp_version}/{gateway.whatsapp_from_phone}/messages',
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Authorization': f'Bearer {gateway.token}'
-                },
-                'json': json,
-                'mail_message_id': message.id,
-            })
+            self.env["whatsapp.request"].sudo().create(
+                {
+                    "url": f"https://graph.facebook.com/v{gateway.whatsapp_version}/{gateway.whatsapp_from_phone}/messages",
+                    "headers": {
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {gateway.token}",
+                    },
+                    "json": json,
+                    "mail_message_id": message.id,
+                }
+            )
 
     def create_message(self, mobile, body_message, gateway_id):
-        channel = self.env['mail.channel'].search([
-            ('gateway_channel_token', '=', mobile),
-            ('gateway_id', '=', gateway_id.id)
-        ], limit=1)
+        channel = self.env["mail.channel"].search(
+            [
+                ("gateway_channel_token", "=", mobile),
+                ("gateway_id", "=", gateway_id.id),
+            ],
+            limit=1,
+        )
 
         if channel:
-            message = channel.with_context({
-                'no_gateway_notification': True,
-                'no_auto_pin': not channel.queue_id
-            }).message_post(
+            message = channel.with_context(
+                {"no_gateway_notification": True, "no_auto_pin": not channel.queue_id}
+            ).message_post(
                 body=body_message,
-                author_id=2 if self.env.context.get('is_internal') else self.env['res.users'].browse(
-                    self.env.uid).partner_id.id,
+                author_id=2
+                if self.env.context.get("is_internal")
+                else self.env["res.users"].browse(self.env.uid).partner_id.id,
                 message_type="comment",
                 subtype_xmlid="mail.mt_comment",
                 gateway_type="whatsapp",
