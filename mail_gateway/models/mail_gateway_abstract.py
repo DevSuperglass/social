@@ -11,8 +11,19 @@ class MailGatewayAbstract(models.AbstractModel):
         context = message.get('context', {})
         if context:
             context_id = context.get('id')
-            return self.env['mail.message'].sudo().search([('whatsapp_id', '=like', context_id)],
-                                                          limit=1).id
+            message_id = self.env['mail.message'].sudo().search(
+                    [
+                        ('whatsapp_id', '=like', context_id)
+                    ], 
+                limit=1
+            )
+    
+            if not message_id:
+                _logger.warning(f"Mensagem pai não encontrada para whatsapp_id semelhante a '{context_id}' nos registros.")
+                return 
+    
+            return message_id.id
+        _logger.warning("Contexto não encontrado")
 
     def _verify_update(self, bot_data, kwargs):
         return True
