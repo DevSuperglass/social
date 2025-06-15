@@ -238,6 +238,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
     def _process_button(self, button_template, message):
         parent_id = self._get_parent_message(message)
+
+        if not parent_id:
+            return
     
         if button_template:
             waid_record = request.env['whatsapp.template.waid'].sudo().search([
