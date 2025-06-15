@@ -239,10 +239,19 @@ class MailGatewayWhatsappService(models.AbstractModel):
     def _process_button(self, button_template, message):
         parent_id = self._get_parent_message(message)
         if button_template:
-            button_record = request.env['whatsapp.template.button'].sudo().search(
-                [('name', '=', button_template), ('whatsapp_template_id', '=',
-                                                  request.env['whatsapp.template.waid'].sudo().search(
-                                                      [('mail_message_id', '=', parent_id)]).whatsapp_template_id.id)])
+            waid_record = request.env['whatsapp.template.waid'].sudo().search([
+                ('mail_message_id', '=', parent_id)
+            ])
+    
+            if not waid_record:
+                _logger.warning(f"No whatsapp.template.waid found for mail_message_id {parent_id}")
+                return False
+    
+            button_record = request.env['whatsapp.template.button'].sudo().search([
+                ('name', '=', button_template),
+                ('whatsapp_template_id', '=', waid_record.whatsapp_template_id.id)
+            ])
+    
             if button_record.code:
                 model = button_record.env[button_record.model_id.model].with_context(
                     button=button_template,
