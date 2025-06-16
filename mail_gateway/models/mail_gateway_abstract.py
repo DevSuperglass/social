@@ -12,7 +12,7 @@ class MailGatewayAbstract(models.AbstractModel):
 
     def _get_parent_message(self, message):
         context = message.get('context', {})
-        if context:
+        if context and 'forwarded' not in context:
             context_id = context.get('id')
             message_id = self.env['mail.message'].sudo().search(
                     [
@@ -26,7 +26,6 @@ class MailGatewayAbstract(models.AbstractModel):
                 return 
     
             return message_id.id
-        _logger.warning("Contexto não encontrado")
 
     def _verify_update(self, bot_data, kwargs):
         return True
