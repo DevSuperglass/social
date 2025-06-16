@@ -12,7 +12,7 @@ class MailGatewayAbstract(models.AbstractModel):
 
     def _get_parent_message(self, message):
         context = message.get('context', {})
-        if context and 'forwarded' not in context:
+        if 'id' in context:
             context_id = context.get('id')
             message_id = self.env['mail.message'].sudo().search(
                     [
