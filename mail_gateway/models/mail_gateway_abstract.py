@@ -1,6 +1,9 @@
 # Copyright 2024 Dixmit
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 from odoo import Command, models
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 class MailGatewayAbstract(models.AbstractModel):
