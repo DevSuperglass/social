@@ -22,7 +22,7 @@ class MailGatewayAbstract(models.AbstractModel):
             )
     
             if not message_id:
-                _logger.warning(f"Mensagem pai não encontrada para whatsapp_id semelhante a '{context_id}' e contexto '{context}' nos registros.")
+                _logger.warning(f"Mensagem pai não encontrada para whatsapp_id semelhante a '{context_id}', contexto '{context}' e mensagem '{message}' nos registros.")
                 return 
     
             return message_id.id
