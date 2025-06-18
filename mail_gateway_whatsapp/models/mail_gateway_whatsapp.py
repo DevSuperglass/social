@@ -13,7 +13,7 @@ import requests
 import requests_toolbelt
 
 from odoo import _, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.http import request
 from odoo.tools import html2plaintext
 
@@ -212,25 +212,17 @@ class MailGatewayWhatsappService(models.AbstractModel):
             })
             self._send_attendance_start(mobile=channel_id.gateway_channel_token)
 
-    @staticmethod
-    def is_no_pin_message(message):
-        body = message.get('button', {}).get('text')
-
-        if body in ['CONFIRMAR', 'DESISTIR']:
-            return True
-        return False
-
     def _send_attendance_start(self, mobile):
-        self.with_context({'is_internal': True})._send_tmpl_message(tmpl_name=None,
-                                                                    gateway_phone='335789752960181',
-                                                                    components="Seu atendimento será iniciado em breve",
-                                                                    mobile_list=[mobile],
-                                                                    body_message="Seu atendimento será iniciado em breve"
-                                                                    )
+        self.with_context({'is_internal': True})._send_tmpl_message(
+            tmpl_name=None,
+            gateway_phone='335789752960181',
+            components="Seu atendimento será iniciado em breve",
+            mobile_list=[mobile],
+            body_message="Seu atendimento será iniciado em breve"
+        )
 
     def _get_crm_meta(self, number):
-        change_status = self.env['crm.lead'].sudo().search(
-            [('mobile', '=', number), ('new_status', '=', 'draft')])
+        change_status = self.env['crm.lead'].sudo().search([('mobile', '=', number), ('new_status', '=', 'draft')])
 
         if change_status:
             change_status.new_status = 'in_progress'
@@ -241,17 +233,21 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
         if not parent_id:
             return
-    
+
         if button_template:
-            waid_record = request.env['whatsapp.template.waid'].sudo().search([
-                ('mail_message_id', '=', parent_id)
-            ])
-    
-            button_record = request.env['whatsapp.template.button'].sudo().search([
-                ('name', '=', button_template),
-                ('whatsapp_template_id', '=', waid_record.whatsapp_template_id.id)
-            ])
-    
+            waid_record = request.env['whatsapp.template.waid'].sudo().search(
+                [
+                    ('mail_message_id', '=', parent_id)
+                ]
+            )
+
+            button_record = request.env['whatsapp.template.button'].sudo().search(
+                [
+                    ('name', '=', button_template),
+                    ('whatsapp_template_id', '=', waid_record.whatsapp_template_id.id)
+                ]
+            )
+
             if button_record.code:
                 model = button_record.env[button_record.model_id.model].with_context(
                     button=button_template,
@@ -311,7 +307,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
                 url = "https://graph.facebook.com/v%s/%s/messages" % (
                     gateway.whatsapp_version,
-                    gateway.whatsapp_from_phone)
+                    gateway.whatsapp_from_phone
+                )
                 headers = {"Authorization": "Bearer %s" % gateway.token}
                 json = self._send_payload(
                     record.gateway_channel_id,
@@ -331,28 +328,22 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 )
                 headers = {"Authorization": "Bearer %s" % gateway.token}
                 json = self._send_payload(record.gateway_channel_id, body=body)
+                if message:
+                    raise ValidationError(
+                        "Não é possível enviar descrição e mídia na mesma mensagem. \n"
+                        "Envie o conteúdo em mensagens separadas e referencie uma à outra para garantir a contextualização."
+                    )
                 message = self._create_request_line(url=url, headers=headers, json=json, record=record)
         except Exception as exc:
-            buff = StringIO()
-            traceback.print_exc(file=buff)
-            _logger.error(buff.getvalue())
-            if raise_exception:
-                raise MailDeliveryException(
-                    _("Unable to send the whatsapp message")
-                ) from exc
-            else:
-                _logger.warning(
-                    "Issue sending message with id {}: {}".format(record.id, exc)
-                )
-                record.sudo().write(
-                    {"notification_status": "exception", "failure_reason": exc}
-                )
+            raise UserError(
+                _("Erro ao enviar a mensagem pelo WhatsApp:\n%s") % str(exc)
+            )
+
         if message:
             record.sudo().write(
                 {
                     "notification_status": "sent",
                     "failure_reason": False,
-                    # "gateway_message_id": message["messages"][0]["id"],
                 }
             )
 
@@ -361,8 +352,12 @@ class MailGatewayWhatsappService(models.AbstractModel):
             self.env.cr.commit()
 
     def _create_request_line(self, url, headers, json, record):
-        return self.env['whatsapp.request'].sudo().create(
-            {'url': url, 'headers': headers, 'json': json, 'mail_message_id': record.mail_message_id.id})
+        return self.env['whatsapp.request'].sudo().create({
+            'url': url,
+            'headers': headers,
+            'json': json,
+            'mail_message_id': record.mail_message_id.id
+        })
 
     def _send_payload(
         self, channel, body=False, media_id=False, media_type=False, media_name=False
