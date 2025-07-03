@@ -408,11 +408,10 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         }
                     }
             else:
-                message_body = message_id
-                if message_body.parent_id:
+                if message_id.parent_id:
                     context_data = {
                         "context": {
-                            "message_id": message_body.parent_id.whatsapp_id
+                            "message_id": message_id.parent_id.whatsapp_id
                         }
                     }
             payload.update({
@@ -429,10 +428,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 media_type: media_data,
             })
             if body:
-                body = body
-                body = html2plaintext(body)
                 user_name = "*[{}]* ".format(self.env.user.name)
-                formated_body = user_name + body
+                formated_body = user_name + html2plaintext(body)
                 payload.get("image").update({'caption': formated_body})
 
 
