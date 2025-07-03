@@ -1,5 +1,6 @@
 # Copyright 2024 Dixmit
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
+import base64
 import hashlib
 import hmac
 import logging
@@ -97,6 +98,22 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
         return converted_content
 
+    def base64_decode(self, base64_string):
+        pattern = re.compile(b'^\x1c\x18(?:\x0c|\r)(\d+)\x15\x02\x00(.)\x18(.)([A-Z0-9]+)\x00$')
+        base64_string = base64_string[6:]
+        if not base64_string:
+            return None
+        if len(base64_string) % 4 != 0:
+            _logger.warning("Tamanho do id em base64 não é divisivel por 4: %s", base64_string)
+        try:
+            decoded_bytes = base64.b64decode(base64_string)
+            match = pattern.search(decoded_bytes)
+            if match:
+                return match.group(4).decode("UTF8")
+        except Exception as e:
+            _logger.error("Erro ao decodificar base64 no recebimento: %s", e)
+            return None
+
     def _process_update(self, chat, message, value):
         chat.ensure_one()
         body = ""
@@ -179,6 +196,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 message_type="comment",
                 attachments=attachments,
                 parent_id=self._get_parent_message(message),
+                whatsapp_decoded_id=self.base64_decode(message.get("id")),
                 whatsapp_id=message.get("id")
             )
             self._post_process_message(new_message, chat)
