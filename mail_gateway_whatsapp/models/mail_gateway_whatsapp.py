@@ -291,6 +291,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
     ):
         message = False
         try:
+            body = self._get_message_body(record)
             attachment_mimetype_map = self._get_whatsapp_mimetype_kind()
             for attachment in record.mail_message_id.attachment_ids:
                 if attachment.mimetype not in attachment_mimetype_map:
@@ -334,10 +335,10 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     media_id=response.json()["id"],
                     media_type=attachment_type,
                     media_name=attachment.name,
+                    body=body
                 )
                 message = self._create_request_line(url=url, headers=headers, json=json, record=record)
 
-            body = self._get_message_body(record)
             if body and not message:
                 user_name = "*[{}]* ".format(self.env.user.name)
                 body = user_name + body
@@ -389,7 +390,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
         context_data = {}
 
-        if body:
+        if body and not media_id:
             formated_body = re.sub(r"\*.*\*", "", body).strip()
             last_message = self.env['mail.message'].search([
                 ('model', '=', 'mail.channel'),
@@ -423,14 +424,6 @@ class MailGatewayWhatsappService(models.AbstractModel):
             })
 
         if media_id:
-            body = self.env['mail.message'].search([
-                ('model', '=', 'mail.channel'),
-                ('res_id', '=', channel.id)
-            ], order='create_date desc', limit=1).body
-            body = html2plaintext(body)
-            user_name = "*[{}]* ".format(self.env.user.name)
-            formated_body = user_name + body
-
             media_data = {"id": media_id}
             if media_type == "document":
                 media_data["filename"] = media_name
@@ -438,7 +431,12 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 "type": media_type,
                 media_type: media_data,
             })
-            payload.get("image").update({'caption': formated_body})
+            if body:
+                body = body
+                body = html2plaintext(body)
+                user_name = "*[{}]* ".format(self.env.user.name)
+                formated_body = user_name + body
+                payload.get("image").update({'caption': formated_body})
 
 
         if context_data:
