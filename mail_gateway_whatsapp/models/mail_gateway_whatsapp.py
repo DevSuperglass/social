@@ -335,7 +335,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     media_id=response.json()["id"],
                     media_type=attachment_type,
                     media_name=attachment.name,
-                    body=body
+                    body=body,
+                    message_id=record.mail_message_id
                 )
                 message = self._create_request_line(url=url, headers=headers, json=json, record=record)
 
@@ -347,7 +348,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     gateway.whatsapp_from_phone,
                 )
                 headers = {"Authorization": "Bearer %s" % gateway.token}
-                json = self._send_payload(record.gateway_channel_id, body=body)
+                json = self._send_payload(record.gateway_channel_id, body=body, message_id=record.mail_message_id)
                 # if message:
                 #     raise ValidationError(
                 #         "Não é possível enviar descrição e mídia na mesma mensagem. \n"
@@ -380,7 +381,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
         })
 
     def _send_payload(
-        self, channel, body=False, media_id=False, media_type=False, media_name=False
+        self, channel, message_id, body=False, media_id=False, media_type=False, media_name=False
     ):
         payload = {
             "messaging_product": "whatsapp",
@@ -407,11 +408,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         }
                     }
             else:
-                message_body = self.env['mail.message'].search([
-                    ('model', '=', 'mail.channel'),
-                    ('res_id', '=', channel.id),
-                    ('body', '=', formated_body)
-                ], order='create_date desc', limit=1)
+                message_body = message_id
                 if message_body.parent_id:
                     context_data = {
                         "context": {
