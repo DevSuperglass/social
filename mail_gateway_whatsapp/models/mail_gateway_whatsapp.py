@@ -128,6 +128,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             if message.get(key):
                 image_id = message.get(key).get("id")
                 if image_id:
+                    body = message.get("image").get("caption")
                     image_info_request = requests.get(
                         "https://graph.facebook.com/v%s/%s"
                         % (
@@ -337,7 +338,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 message = self._create_request_line(url=url, headers=headers, json=json, record=record)
 
             body = self._get_message_body(record)
-            if body:
+            if body and not message:
                 user_name = "*[{}]* ".format(self.env.user.name)
                 body = user_name + body
                 url = "https://graph.facebook.com/v%s/%s/messages" % (
@@ -346,11 +347,11 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 )
                 headers = {"Authorization": "Bearer %s" % gateway.token}
                 json = self._send_payload(record.gateway_channel_id, body=body)
-                if message:
-                    raise ValidationError(
-                        "Não é possível enviar descrição e mídia na mesma mensagem. \n"
-                        "Envie o conteúdo em mensagens separadas e referencie uma à outra para garantir a contextualização."
-                    )
+                # if message:
+                #     raise ValidationError(
+                #         "Não é possível enviar descrição e mídia na mesma mensagem. \n"
+                #         "Envie o conteúdo em mensagens separadas e referencie uma à outra para garantir a contextualização."
+                #     )
                 message = self._create_request_line(url=url, headers=headers, json=json, record=record)
         except Exception as exc:
             raise UserError(
@@ -422,6 +423,14 @@ class MailGatewayWhatsappService(models.AbstractModel):
             })
 
         if media_id:
+            body = self.env['mail.message'].search([
+                ('model', '=', 'mail.channel'),
+                ('res_id', '=', channel.id)
+            ], order='create_date desc', limit=1).body
+            body = html2plaintext(body)
+            user_name = "*[{}]* ".format(self.env.user.name)
+            formated_body = user_name + body
+
             media_data = {"id": media_id}
             if media_type == "document":
                 media_data["filename"] = media_name
@@ -429,6 +438,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 "type": media_type,
                 media_type: media_data,
             })
+            payload.get("image").update({'caption': formated_body})
+
 
         if context_data:
             payload.update(context_data)
