@@ -391,33 +391,12 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
         context_data = {}
 
-        if body and not media_id:
-            formated_body = re.sub(r"\*.*\*", "", body).strip()
-            last_message = self.env['mail.message'].search([
-                ('model', '=', 'mail.channel'),
-                ('res_id', '=', channel.id)
-            ], order='create_date desc', limit=1)
-
-            last_message_body = str(last_message.body)
-
-            if last_message_body == formated_body:
-                if last_message.parent_id:
-                    context_data = {
-                        "context": {
-                            "message_id": last_message.parent_id.whatsapp_id
-                        }
-                    }
-            else:
-                if message_id.parent_id:
-                    context_data = {
-                        "context": {
-                            "message_id": message_id.parent_id.whatsapp_id
-                        }
-                    }
-            payload.update({
-                "type": "text",
-                "text": {"preview_url": False, "body": html2plaintext(body)},
-            })
+        if message_id.parent_id:
+            context_data = {
+                "context": {
+                    "message_id": message_id.parent_id.whatsapp_id
+                }
+            }
 
         if media_id:
             media_data = {"id": media_id}
@@ -432,6 +411,11 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 formated_body = user_name + html2plaintext(body)
                 payload.get("image").update({'caption': formated_body})
 
+        elif body:
+            payload.update({
+                "type": "text",
+                "text": {"preview_url": False, "body": html2plaintext(body)},
+            })
 
         if context_data:
             payload.update(context_data)
