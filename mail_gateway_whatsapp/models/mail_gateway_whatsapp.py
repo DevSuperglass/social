@@ -409,7 +409,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             if body:
                 user_name = "*[{}]* ".format(self.env.user.name)
                 formated_body = user_name + html2plaintext(body)
-                payload.get("image").update({'caption': formated_body})
+                payload.get("image").update({"caption": formated_body})
 
         elif body:
             payload.update({
