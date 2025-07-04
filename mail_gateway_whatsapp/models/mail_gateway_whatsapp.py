@@ -128,7 +128,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             if message.get(key):
                 image_id = message.get(key).get("id")
                 if image_id:
-                    body = message.get("image").get("caption")
+                    body = message.get("image").get("caption") or ""
                     image_info_request = requests.get(
                         "https://graph.facebook.com/v%s/%s"
                         % (
@@ -184,7 +184,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             )
         if message.get("contacts"):
             pass
-        if len(body) > 0 or attachments:
+        if body or attachments:
             author = self._get_author(chat.gateway_id, value)
             if not chat.route_id and author.route_id:
                 chat.write({'route_id': author.route_id.id})
