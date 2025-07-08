@@ -30,7 +30,7 @@ class MailGateway(models.Model):
         help="User that will create the messages",
     )
     member_ids = fields.Many2many(
-        "res.users", default=lambda self: [Command.link(self.env.user.id)]
+        "res.users", default=lambda self: [Command.link(self.env.user.id)],
     )
     company_id = fields.Many2one(
         "res.company", default=lambda self: self.env.company.id
@@ -85,6 +85,22 @@ class MailGateway(models.Model):
         self.set_webhook()
 
     def write(self, vals):
+        if 'member_ids' in vals:
+            current_ids = set(self.member_ids.ids)
+            commands = vals.get('member_ids')
+            new_ids = set(commands[0][2])
+            added_ids = new_ids - current_ids
+            removed_ids = current_ids - new_ids
+            gateway_group_id = self.env.ref('mail_gateway.gateway_user').id
+            if added_ids:
+                for user_id in self.member_ids.browse(added_ids):
+                    user_id.write({'groups_id':[Command.link(gateway_group_id)]})
+                    mail_channel_members = self.env['mail.channel.member'].search([('partner_id', '=', user_id.partner_id.id), ('is_pinned', '=', True)])
+                    if mail_channel_members:
+                        mail_channel_members.write({'is_pinned': False})
+            if removed_ids:
+                for user_id in self.member_ids.browse(removed_ids):
+                    user_id.write({'groups_id':[Command.unlink(gateway_group_id)]})
         res = super(MailGateway, self).write(vals)
         if (
             "webhook_key" in vals
