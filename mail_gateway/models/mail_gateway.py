@@ -30,7 +30,7 @@ class MailGateway(models.Model):
         help="User that will create the messages",
     )
     member_ids = fields.Many2many(
-        "res.users", default=lambda self: [Command.link(self.env.user.id)],
+        "res.users", default=lambda self: [Command.link(self.env.user.id)]
     )
     company_id = fields.Many2one(
         "res.company", default=lambda self: self.env.company.id
