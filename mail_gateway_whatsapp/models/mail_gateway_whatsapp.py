@@ -126,14 +126,14 @@ class MailGatewayWhatsappService(models.AbstractModel):
             body = message.get('button').get('text')
         for key in ["image", "audio", "video", "document", "sticker"]:
             if message.get(key):
-                image_id = message.get(key).get("id")
-                if image_id:
-                    body = message.get("image").get("caption") or ""
-                    image_info_request = requests.get(
+                attachment_id = message.get(key).get("id")
+                if attachment_id:
+                    body = message.get(key).get("caption") or ""
+                    info_requests = requests.get(
                         "https://graph.facebook.com/v%s/%s"
                         % (
                             chat.gateway_id.whatsapp_version,
-                            image_id,
+                            attachment_id,
                         ),
                         headers={
                             "Authorization": "Bearer %s" % chat.gateway_id.token,
@@ -141,36 +141,36 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         timeout=10,
                         proxies=self._get_proxies(),
                     )
-                    image_info_request.raise_for_status()
-                    image_info = image_info_request.json()
-                    image_url = image_info["url"]
+                    info_requests.raise_for_status()
+                    attachment_json = info_requests.json()
+                    attachment_url = attachment_json["url"]
                 else:
-                    image_url = message.get(key).get("url")
-                if not image_url:
+                    attachment_url = message.get(key).get("url")
+                if not attachment_url:
                     continue
-                image_request = requests.get(
-                    image_url,
+                attachment_request = requests.get(
+                    attachment_url,
                     headers={
                         "Authorization": "Bearer %s" % chat.gateway_id.token,
                     },
                     timeout=10,
                     proxies=self._get_proxies(),
                 )
-                image_request.raise_for_status()
+                attachment_request.raise_for_status()
 
                 converted_audio = None
 
                 if key == 'audio':
-                    image_info['mime_type'] = 'audio/mpeg'
-                    converted_audio = self.convert_audio(content=image_request.content)
+                    attachment_json['mime_type'] = 'audio/mpeg'
+                    converted_audio = self.convert_audio(content=attachment_request.content)
 
                 attachments.append(
                     (
                         "{}{}".format(
-                            image_id,
-                            mimetypes.guess_extension(image_info["mime_type"]),
+                            attachment_id,
+                            mimetypes.guess_extension(attachment_json["mime_type"]),
                         ),
-                        image_request.content if key != 'audio' else converted_audio,
+                        attachment_request.content if key != 'audio' else converted_audio,
                     )
                 )
         if message.get("location"):
