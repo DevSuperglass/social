@@ -1,5 +1,6 @@
 # Copyright 2024 Dixmit
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
+import base64
 import hashlib
 import hmac
 import logging
@@ -13,7 +14,7 @@ import requests
 import requests_toolbelt
 
 from odoo import _, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.http import request
 from odoo.tools import html2plaintext
 
@@ -97,6 +98,22 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
         return converted_content
 
+    def base64_decode(self, base64_string):
+        pattern = re.compile(b'^\x1c\x18(?:\x0c|\r)(\d+)\x15\x02\x00(.)\x18(.)([A-Z0-9]+)\x00$')
+        base64_string = base64_string[6:]
+        if not base64_string:
+            return None
+        if len(base64_string) % 4 != 0:
+            _logger.warning("Tamanho do id em base64 não é divisivel por 4: %s", base64_string)
+        try:
+            decoded_bytes = base64.b64decode(base64_string)
+            match = pattern.search(decoded_bytes)
+            if match:
+                return match.group(4).decode("UTF8")
+        except Exception as e:
+            _logger.error("Erro ao decodificar base64 no recebimento: %s", e)
+            return None
+
     def _process_update(self, chat, message, value):
         chat.ensure_one()
         body = ""
@@ -109,13 +126,14 @@ class MailGatewayWhatsappService(models.AbstractModel):
             body = message.get('button').get('text')
         for key in ["image", "audio", "video", "document", "sticker"]:
             if message.get(key):
-                image_id = message.get(key).get("id")
-                if image_id:
-                    image_info_request = requests.get(
+                attachment_id = message.get(key).get("id")
+                if attachment_id:
+                    body = message.get(key).get("caption") or ""
+                    info_requests = requests.get(
                         "https://graph.facebook.com/v%s/%s"
                         % (
                             chat.gateway_id.whatsapp_version,
-                            image_id,
+                            attachment_id,
                         ),
                         headers={
                             "Authorization": "Bearer %s" % chat.gateway_id.token,
@@ -123,36 +141,36 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         timeout=10,
                         proxies=self._get_proxies(),
                     )
-                    image_info_request.raise_for_status()
-                    image_info = image_info_request.json()
-                    image_url = image_info["url"]
+                    info_requests.raise_for_status()
+                    attachment_json = info_requests.json()
+                    attachment_url = attachment_json["url"]
                 else:
-                    image_url = message.get(key).get("url")
-                if not image_url:
+                    attachment_url = message.get(key).get("url")
+                if not attachment_url:
                     continue
-                image_request = requests.get(
-                    image_url,
+                attachment_request = requests.get(
+                    attachment_url,
                     headers={
                         "Authorization": "Bearer %s" % chat.gateway_id.token,
                     },
                     timeout=10,
                     proxies=self._get_proxies(),
                 )
-                image_request.raise_for_status()
+                attachment_request.raise_for_status()
 
                 converted_audio = None
 
                 if key == 'audio':
-                    image_info['mime_type'] = 'audio/mpeg'
-                    converted_audio = self.convert_audio(content=image_request.content)
+                    attachment_json['mime_type'] = 'audio/mpeg'
+                    converted_audio = self.convert_audio(content=attachment_request.content)
 
                 attachments.append(
                     (
                         "{}{}".format(
-                            image_id,
-                            mimetypes.guess_extension(image_info["mime_type"]),
+                            attachment_id,
+                            mimetypes.guess_extension(attachment_json["mime_type"]),
                         ),
-                        image_request.content if key != 'audio' else converted_audio,
+                        attachment_request.content if key != 'audio' else converted_audio,
                     )
                 )
         if message.get("location"):
@@ -166,7 +184,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             )
         if message.get("contacts"):
             pass
-        if len(body) > 0 or attachments:
+        if body or attachments:
             author = self._get_author(chat.gateway_id, value)
             if not chat.route_id and author.route_id:
                 chat.write({'route_id': author.route_id.id})
@@ -179,6 +197,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 message_type="comment",
                 attachments=attachments,
                 parent_id=self._get_parent_message(message),
+                whatsapp_decoded_id=self.base64_decode(message.get("id")),
                 whatsapp_id=message.get("id")
             )
             self._post_process_message(new_message, chat)
@@ -212,25 +231,17 @@ class MailGatewayWhatsappService(models.AbstractModel):
             })
             self._send_attendance_start(mobile=channel_id.gateway_channel_token)
 
-    @staticmethod
-    def is_no_pin_message(message):
-        body = message.get('button', {}).get('text')
-
-        if body in ['CONFIRMAR', 'DESISTIR']:
-            return True
-        return False
-
     def _send_attendance_start(self, mobile):
-        self.with_context({'is_internal': True})._send_tmpl_message(tmpl_name=None,
-                                                                    gateway_phone='335789752960181',
-                                                                    components="Seu atendimento será iniciado em breve",
-                                                                    mobile_list=[mobile],
-                                                                    body_message="Seu atendimento será iniciado em breve"
-                                                                    )
+        self.with_context({'is_internal': True})._send_tmpl_message(
+            tmpl_name=None,
+            gateway_phone='335789752960181',
+            components="Seu atendimento será iniciado em breve",
+            mobile_list=[mobile],
+            body_message="Seu atendimento será iniciado em breve"
+        )
 
     def _get_crm_meta(self, number):
-        change_status = self.env['crm.lead'].sudo().search(
-            [('mobile', '=', number), ('new_status', '=', 'draft')])
+        change_status = self.env['crm.lead'].sudo().search([('mobile', '=', number), ('new_status', '=', 'draft')])
 
         if change_status:
             change_status.new_status = 'in_progress'
@@ -241,17 +252,21 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
         if not parent_id:
             return
-    
+
         if button_template:
-            waid_record = request.env['whatsapp.template.waid'].sudo().search([
-                ('mail_message_id', '=', parent_id)
-            ])
-    
-            button_record = request.env['whatsapp.template.button'].sudo().search([
-                ('name', '=', button_template),
-                ('whatsapp_template_id', '=', waid_record.whatsapp_template_id.id)
-            ])
-    
+            waid_record = request.env['whatsapp.template.waid'].sudo().search(
+                [
+                    ('mail_message_id', '=', parent_id)
+                ]
+            )
+
+            button_record = request.env['whatsapp.template.button'].sudo().search(
+                [
+                    ('name', '=', button_template),
+                    ('whatsapp_template_id', '=', waid_record.whatsapp_template_id.id)
+                ]
+            )
+
             if button_record.code:
                 model = button_record.env[button_record.model_id.model].with_context(
                     button=button_template,
@@ -276,6 +291,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
     ):
         message = False
         try:
+            body = self._get_message_body(record)
             attachment_mimetype_map = self._get_whatsapp_mimetype_kind()
             for attachment in record.mail_message_id.attachment_ids:
                 if attachment.mimetype not in attachment_mimetype_map:
@@ -311,18 +327,20 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
                 url = "https://graph.facebook.com/v%s/%s/messages" % (
                     gateway.whatsapp_version,
-                    gateway.whatsapp_from_phone)
+                    gateway.whatsapp_from_phone
+                )
                 headers = {"Authorization": "Bearer %s" % gateway.token}
                 json = self._send_payload(
                     record.gateway_channel_id,
                     media_id=response.json()["id"],
                     media_type=attachment_type,
                     media_name=attachment.name,
+                    body=body,
+                    message_id=record.mail_message_id
                 )
                 message = self._create_request_line(url=url, headers=headers, json=json, record=record)
 
-            body = self._get_message_body(record)
-            if body:
+            if body and not message:
                 user_name = "*[{}]* ".format(self.env.user.name)
                 body = user_name + body
                 url = "https://graph.facebook.com/v%s/%s/messages" % (
@@ -330,29 +348,23 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     gateway.whatsapp_from_phone,
                 )
                 headers = {"Authorization": "Bearer %s" % gateway.token}
-                json = self._send_payload(record.gateway_channel_id, body=body)
+                json = self._send_payload(record.gateway_channel_id, body=body, message_id=record.mail_message_id)
+                # if message:
+                #     raise ValidationError(
+                #         "Não é possível enviar descrição e mídia na mesma mensagem. \n"
+                #         "Envie o conteúdo em mensagens separadas e referencie uma à outra para garantir a contextualização."
+                #     )
                 message = self._create_request_line(url=url, headers=headers, json=json, record=record)
         except Exception as exc:
-            buff = StringIO()
-            traceback.print_exc(file=buff)
-            _logger.error(buff.getvalue())
-            if raise_exception:
-                raise MailDeliveryException(
-                    _("Unable to send the whatsapp message")
-                ) from exc
-            else:
-                _logger.warning(
-                    "Issue sending message with id {}: {}".format(record.id, exc)
-                )
-                record.sudo().write(
-                    {"notification_status": "exception", "failure_reason": exc}
-                )
+            raise UserError(
+                _("Erro ao enviar a mensagem pelo WhatsApp:\n%s") % str(exc)
+            )
+
         if message:
             record.sudo().write(
                 {
                     "notification_status": "sent",
                     "failure_reason": False,
-                    # "gateway_message_id": message["messages"][0]["id"],
                 }
             )
 
@@ -361,11 +373,15 @@ class MailGatewayWhatsappService(models.AbstractModel):
             self.env.cr.commit()
 
     def _create_request_line(self, url, headers, json, record):
-        return self.env['whatsapp.request'].sudo().create(
-            {'url': url, 'headers': headers, 'json': json, 'mail_message_id': record.mail_message_id.id})
+        return self.env['whatsapp.request'].sudo().create({
+            'url': url,
+            'headers': headers,
+            'json': json,
+            'mail_message_id': record.mail_message_id.id
+        })
 
     def _send_payload(
-        self, channel, body=False, media_id=False, media_type=False, media_name=False
+        self, channel, message_id, body=False, media_id=False, media_type=False, media_name=False
     ):
         payload = {
             "messaging_product": "whatsapp",
@@ -375,38 +391,12 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
         context_data = {}
 
-        if body:
-            formated_body = re.sub(r"\*.*\*", "", body).strip()
-            last_message = self.env['mail.message'].search([
-                ('model', '=', 'mail.channel'),
-                ('res_id', '=', channel.id)
-            ], order='create_date desc', limit=1)
-
-            last_message_body = str(last_message.body)
-
-            if last_message_body == formated_body:
-                if last_message.parent_id:
-                    context_data = {
-                        "context": {
-                            "message_id": last_message.parent_id.whatsapp_id
-                        }
-                    }
-            else:
-                message_body = self.env['mail.message'].search([
-                    ('model', '=', 'mail.channel'),
-                    ('res_id', '=', channel.id),
-                    ('body', '=', formated_body)
-                ], order='create_date desc', limit=1)
-                if message_body.parent_id:
-                    context_data = {
-                        "context": {
-                            "message_id": message_body.parent_id.whatsapp_id
-                        }
-                    }
-            payload.update({
-                "type": "text",
-                "text": {"preview_url": False, "body": html2plaintext(body)},
-            })
+        if message_id.parent_id:
+            context_data = {
+                "context": {
+                    "message_id": message_id.parent_id.whatsapp_id
+                }
+            }
 
         if media_id:
             media_data = {"id": media_id}
@@ -415,6 +405,16 @@ class MailGatewayWhatsappService(models.AbstractModel):
             payload.update({
                 "type": media_type,
                 media_type: media_data,
+            })
+            if body:
+                user_name = "*[{}]* ".format(self.env.user.name)
+                formated_body = user_name + html2plaintext(body)
+                payload.get("image").update({"caption": formated_body})
+
+        elif body:
+            payload.update({
+                "type": "text",
+                "text": {"preview_url": False, "body": html2plaintext(body)},
             })
 
         if context_data:

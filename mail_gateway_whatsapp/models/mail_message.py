@@ -5,3 +5,4 @@ class MailMessage(models.Model):
     _inherit = 'mail.message'
 
     whatsapp_id = fields.Char()
+    whatsapp_decoded_id = fields.Char()
