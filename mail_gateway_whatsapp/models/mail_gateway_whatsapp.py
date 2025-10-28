@@ -82,7 +82,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         message_id = self._process_update(chat, message, change["value"])
                         if message_id:
                             self._set_queue(chat, message_id)
-                        self._get_crm_meta(message.get("from"))
+                        # self._get_crm_meta(message.get("from"))
                         if message.get("type") != "button":
                             continue
                         self._process_button(message.get("button", {}).get("payload"), message)
@@ -204,7 +204,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             return new_message
         else:
             _logger.warning("JSON DA MENSAGEM VAZIA: " + str(message))
-            return
+            return None
 
     def _set_queue(self, channel_id, message_id):
         """
@@ -251,6 +251,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
         parent_id = self._get_parent_message(message)
 
         if not parent_id:
+            _logger.warning(
+                f"Mensagem {message} não possui pai."
+            )
             return
 
         if button_template:
@@ -276,10 +279,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 if callable(function_to_call):
                     function_to_call()
                 else:
-                    return "Função do botão não é executável."
+                    _logger.warning(f"Função do botão não é executável para a mensagem {message}.")
             else:
-                _logger.warning("Botão do template não encontrado.")
-                return "Botão do template não encontrado."
+                _logger.warning(f"Botão do template não encontrado para a mensagem {message}.")
 
     def _send(
         self,
