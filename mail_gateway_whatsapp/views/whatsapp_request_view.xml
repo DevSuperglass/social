@@ -22,7 +22,7 @@
         <field name="arch" type="xml">
             <tree create="0">
                 <header>
-                    <button name="action_button_reset_response" type="object" string="Resetar Resposta"/>
+                    <button name="action_button_reset_response" type="object" string="Redefinir Respostas"/>
                 </header>
                 <field name="mail_message_id"/>
                 <field name="write_uid" string="Usuário"/>

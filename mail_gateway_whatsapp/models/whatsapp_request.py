@@ -19,12 +19,17 @@ class WhatsappRequest(models.Model):
     )
 
     def action_button_reset_response(self):
-        pass
+        today = fields.date.today()
+        requests = self.env['whatsapp.request'].search([('response', 'ilike', 'error'), ('write_date', '<=', today)])
+        requests.write({
+            'response': None
+        })
 
     def cron_check_response_null(self):
-        requests = self.env['whatsapp.request'].search_count([('response', '=', False)])
+        today = fields.date.today()
+        requests = self.env['whatsapp.request'].search_count([('response', '=', False), ('write_date', '<=', today)])
 
-        if requests >= 10:
+        if requests >= 20:
             it_channel = self.env['mail.channel'].search([('name', 'ilike', 'TI / TI')], limit=1)
 
             it_channel.message_post(
