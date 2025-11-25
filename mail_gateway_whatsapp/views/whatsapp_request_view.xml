@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <odoo>
+
     <record id="whatsapp_request_response_null_action" model="ir.actions.act_window">
         <field name="name">Mensagens Whatsapp</field>
         <field name="res_model">whatsapp.request</field>
@@ -20,7 +21,7 @@
         <field name="model">whatsapp.request</field>
         <field name="type">tree</field>
         <field name="arch" type="xml">
-            <tree create="0">
+            <tree create="0" order="date desc">
                 <header>
                     <button name="action_button_reset_response" type="object" string="Redefinir Mensagens com Erro"/>
                 </header>
