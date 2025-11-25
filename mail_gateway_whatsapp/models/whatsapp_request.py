@@ -20,7 +20,8 @@ class WhatsappRequest(models.Model):
 
     def action_button_reset_response(self):
         today = fields.date.today()
-        non_response_requests = self.env['whatsapp.request'].search([('response', 'ilike', 'error'), ('write_date', '>=', today)])
+        non_response_requests = self.env['whatsapp.request'].search(
+            [('response', 'ilike', 'error'), ('write_date', '>=', today)])
         non_response_requests.write({
             'response': None
         })
@@ -51,7 +52,6 @@ class WhatsappRequest(models.Model):
 
         body = f"<p><b>[Mensagens com erro]</b> ids({error_messages_ids})</p>"
         self._create_warning_message(it_channel, odoobot_id, body, count_error_messages)
-
 
     def _create_warning_message(self, channel, user_id, body, count_messages, min_messages=20):
         if count_messages >= min_messages:
