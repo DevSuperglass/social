@@ -20,8 +20,8 @@ class WhatsappRequest(models.Model):
 
     def action_button_reset_response(self):
         today = fields.date.today()
-        requests = self.env['whatsapp.request'].search([('response', 'ilike', 'error'), ('write_date', '>=', today)])
-        requests.write({
+        non_response_requests = self.env['whatsapp.request'].search([('response', 'ilike', 'error'), ('write_date', '>=', today)])
+        non_response_requests.write({
             'response': None
         })
 
@@ -34,9 +34,6 @@ class WhatsappRequest(models.Model):
             ('write_date', '>=', today)
         ]).mapped('id')
 
-        if len(error_messages_ids) < 20 and requests < 20:
-            return
-
         it_channel = self.env['mail.channel'].search([('name', 'ilike', 'TI / TI')], limit=1)
 
         odoobot_id = self.env['res.partner'].with_context(active_test=False).search(
@@ -48,26 +45,14 @@ class WhatsappRequest(models.Model):
         ).id
 
         if requests >= 20:
-            last_message = self.env['mail.message'].search(
-                [
-                    ('res_id', '=', it_channel.id),
-                    ('author_id', '=', odoobot_id),
-                    ('date', '>=', today),
-                    ('body', 'ilike', "[WhatsApp]")
-                ],
-                order='date desc',
-                limit=1
-            )
-
             body = f"<p><b>[WhatsApp]</b> Atenção! {requests} mensagens do whatsapp estão sem resposta, verifique o serviço <b>whatsapp_post</b></p>"
 
-            if last_message.body != body:
-                it_channel.message_post(
-                    body=body,
-                    message_type="comment",
-                    subtype_xmlid="mail.mt_comment",
-                    author_id=odoobot_id
-                )
+            it_channel.message_post(
+                body=body,
+                message_type="comment",
+                subtype_xmlid="mail.mt_comment",
+                author_id=odoobot_id
+            )
 
         if len(error_messages_ids) >= 20:
             last_message = self.env['mail.message'].search(
