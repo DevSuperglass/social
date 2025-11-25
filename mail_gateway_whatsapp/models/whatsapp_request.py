@@ -33,6 +33,7 @@ class WhatsappRequest(models.Model):
             ('response', 'ilike', 'error'),
             ('write_date', '>=', today)
         ]).mapped('id')
+        count_error_messages = len(error_messages_ids)
 
         it_channel = self.env['mail.channel'].search([('name', 'ilike', 'TI / TI')], limit=1)
 
@@ -44,34 +45,19 @@ class WhatsappRequest(models.Model):
             limit=1
         ).id
 
-        if requests >= 20:
-            body = f"<p><b>[WhatsApp]</b> Atenção! {requests} mensagens do whatsapp estão sem resposta, verifique o serviço <b>whatsapp_post</b></p>"
+        body = (f"<p><b>[WhatsApp]</b> Atenção! {requests} mensagens do whatsapp estão sem resposta, "
+                f"verifique o serviço <b>whatsapp_post</b></p>")
+        self._create_warning_message(it_channel, odoobot_id, body, requests)
 
-            it_channel.message_post(
+        body = f"<p><b>[Mensagens com erro]</b> ids({error_messages_ids})</p>"
+        self._create_warning_message(it_channel, odoobot_id, body, count_error_messages)
+
+
+    def _create_warning_message(self, channel, user_id, body, count_messages, min_messages=20):
+        if count_messages >= min_messages:
+            channel.message_post(
                 body=body,
                 message_type="comment",
                 subtype_xmlid="mail.mt_comment",
-                author_id=odoobot_id
+                author_id=user_id
             )
-
-        if len(error_messages_ids) >= 20:
-            last_message = self.env['mail.message'].search(
-                [
-                    ('res_id', '=', it_channel.id),
-                    ('author_id', '=', odoobot_id),
-                    ('date', '>=', today),
-                    ('body', 'ilike', "[Mensagens com erro]")
-                ],
-                order='date desc',
-                limit=1
-            )
-
-            body = f"<p><b>[Mensagens com erro]</b> ids({error_messages_ids})</p>"
-
-            if last_message.body != body:
-                it_channel.message_post(
-                    body=body,
-                    message_type="comment",
-                    subtype_xmlid="mail.mt_comment",
-                    author_id=odoobot_id
-                )
