@@ -34,7 +34,6 @@ class WhatsappRequest(models.Model):
             ('response', 'ilike', 'error'),
             ('write_date', '>=', today)
         ]).mapped('id')
-        count_error_messages = len(error_messages_ids)
 
         it_channel = self.env['mail.channel'].search([('name', 'ilike', 'TI / TI')], limit=1)
 
@@ -46,18 +45,39 @@ class WhatsappRequest(models.Model):
             limit=1
         ).id
 
-        body = (f"<p><b>[WhatsApp]</b> Atenção! {requests} mensagens do whatsapp estão sem resposta, "
-                f"verifique o serviço <b>whatsapp_post</b></p>")
-        self._create_warning_message(it_channel, odoobot_id, body, requests)
+        messages = [{
+            'body': (f"<p><b>[WhatsApp]</b> Atenção! {requests} mensagens do whatsapp estão sem resposta, "
+                     f"verifique o serviço <b>whatsapp_post</b></p>"),
+            'quantity': requests,
+            'min_quantity': 20
+        }]
+
+        last_error_mail_message = self.env['mail.message'].search(
+            [
+                ('body', 'ilike', '[Mensagens com erro]'),
+                ('author_id', '=', odoobot_id),
+                ('res_id', '=', it_channel.id)
+            ],
+            order="write_date desc",
+            limit=1
+        )
 
         body = f"<p><b>[Mensagens com erro]</b> ids({error_messages_ids})</p>"
-        self._create_warning_message(it_channel, odoobot_id, body, count_error_messages)
+        if last_error_mail_message.body != body:
+            messages.append({
+                'body': body,
+                'quantity': len(error_messages_ids),
+                'min_quantity': 20
+            })
 
-    def _create_warning_message(self, channel, user_id, body, count_messages, min_messages=20):
-        if count_messages >= min_messages:
-            channel.message_post(
-                body=body,
-                message_type="comment",
-                subtype_xmlid="mail.mt_comment",
-                author_id=user_id
-            )
+        self._create_warning_messages(it_channel, odoobot_id, messages)
+
+    def _create_warning_messages(self, channel, user_id, messages):
+        for message in messages:
+            if message['quantity'] >= message['min_quantity']:
+                channel.message_post(
+                    body=message['body'],
+                    message_type="comment",
+                    subtype_xmlid="mail.mt_comment",
+                    author_id=user_id
+                )
