@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+
+    <record id="whatsapp_request_response_null_action" model="ir.actions.act_window">
+        <field name="name">Mensagens Whatsapp</field>
+        <field name="res_model">whatsapp.request</field>
+        <field name="view_mode">tree</field>
+        <field name="domain">[('write_date', '!=', False)]</field>
+        <field name="context">{'search_default_non_response_requests_filter': 1}</field>
+    </record>
+
+    <menuitem
+        id="whatsapp_request_response_null_menuitem"
+        name="Mensagens WhatsApp"
+        action="whatsapp_request_response_null_action"
+        parent="mail.mail_menu_technical"
+        sequence="3"
+    />
+
+    <record id="whatsapp_request_response_null_view" model="ir.ui.view">
+        <field name="name">whatsapp.request.response.null.view</field>
+        <field name="model">whatsapp.request</field>
+        <field name="type">tree</field>
+        <field name="arch" type="xml">
+            <tree create="0" default_order="write_date desc" limit="20">
+                <header>
+                    <button name="action_button_reset_response" type="object" string="Redefinir Mensagens com Erro"/>
+                </header>
+                <field name="mail_message_id" string="Mensagem"/>
+                <field name="response" string="Response"/>
+                <field name="json" string="Json" optional="hide"/>
+                <field name="headers" string="Header" optional="hide"/>
+                <field name="write_uid" string="Usuário"/>
+                <field name="write_date" string="Data de envio"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="whatsapp_request_response_null_search" model="ir.ui.view">
+        <field name="name">whatsapp.request.response.null.search</field>
+        <field name="model">whatsapp.request</field>
+        <field name="arch" type="xml">
+            <search>
+                <filter string="Mensagens sem resposta" name="non_response_requests_filter"
+                        domain="[('response', '=', False), ('write_date', '>=', today)]"/>
+                <filter string="Mensagens com erro" name="error_response_requests_filter"
+                        domain="[('response', 'ilike', 'error')]"/>
+            </search>
+        </field>
+    </record>
+</odoo>
