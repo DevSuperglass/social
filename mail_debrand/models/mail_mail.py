@@ -7,6 +7,7 @@ from odoo import models
 
 class MailMail(models.AbstractModel):
     _inherit = "mail.mail"
+    _description = "Modelo adicionado automaticamente"
 
     def _send_prepare_body(self):
         body_html = super()._send_prepare_body()

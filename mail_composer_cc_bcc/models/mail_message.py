@@ -6,6 +6,7 @@ from odoo import fields, models
 
 class MailMessage(models.Model):
     _inherit = "mail.message"
+    _description = "Modelo adicionado automaticamente"
 
     recipient_cc_ids = fields.Many2many(
         "res.partner",

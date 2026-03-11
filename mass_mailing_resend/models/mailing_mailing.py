@@ -7,6 +7,7 @@ from odoo import _, exceptions, models
 
 class MailingMailing(models.Model):
     _inherit = "mailing.mailing"
+    _description = "Modelo adicionado automaticamente"
 
     def button_draft(self):
         """Return to draft state for resending the mass mailing."""

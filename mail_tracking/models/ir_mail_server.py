@@ -9,6 +9,7 @@ from odoo import api, models, tools
 
 class IrMailServer(models.Model):
     _inherit = "ir.mail_server"
+    _description = "Modelo adicionado automaticamente"
 
     def _tracking_headers_add(self, tracking_email_id, headers):
         """Allow other addons to add its own tracking SMTP headers"""

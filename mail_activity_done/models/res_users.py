@@ -5,6 +5,7 @@ from odoo import api, fields, models, modules
 
 class ResUsers(models.Model):
     _inherit = "res.users"
+    _description = "Modelo adicionado automaticamente"
 
     @api.model
     def systray_get_activities(self):

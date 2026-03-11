@@ -8,6 +8,7 @@ from .mail_mail import format_emails
 
 class MailThread(models.AbstractModel):
     _inherit = "mail.thread"
+    _description = "Modelo adicionado automaticamente"
 
     def _message_create(self, values_list):
         context = self.env.context

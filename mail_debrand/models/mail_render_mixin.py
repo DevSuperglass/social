@@ -13,6 +13,7 @@ from odoo import api, models
 
 class MailRenderMixin(models.AbstractModel):
     _inherit = "mail.render.mixin"
+    _description = "Modelo adicionado automaticamente"
 
     def remove_href_odoo(self, value, to_keep=None):
         if len(value) < 20:

@@ -7,6 +7,7 @@ from odoo import models
 
 class MailingContact(models.Model):
     _inherit = "mailing.contact"
+    _description = "Modelo adicionado automaticamente"
 
     _sql_constraints = [
         (

@@ -5,6 +5,7 @@ from odoo import models
 
 class MailThread(models.AbstractModel):
     _inherit = "mail.thread"
+    _description = "Modelo adicionado automaticamente"
 
     def _notify_thread_by_email(self, message, recipients_data, **kwargs):
         partners_data = [r for r in recipients_data if r["notif"] == "gateway"]

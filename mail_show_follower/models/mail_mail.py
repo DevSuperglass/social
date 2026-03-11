@@ -5,6 +5,7 @@ from odoo import api, models, tools
 
 class MailMail(models.Model):
     _inherit = "mail.mail"
+    _description = "Modelo adicionado automaticamente"
 
     @api.model
     def _build_cc_text(self, partners):

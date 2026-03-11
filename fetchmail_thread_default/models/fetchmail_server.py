@@ -6,6 +6,7 @@ from odoo import api, fields, models
 
 class FetchmailServer(models.Model):
     _inherit = "fetchmail.server"
+    _description = "Modelo adicionado automaticamente"
 
     default_thread_id = fields.Reference(
         selection="_get_thread_models",

@@ -5,6 +5,7 @@ from odoo import api, fields, models
 
 class MailActivity(models.Model):
     _inherit = "mail.activity"
+    _description = "Modelo adicionado automaticamente"
 
     partner_id = fields.Many2one(
         comodel_name="res.partner",

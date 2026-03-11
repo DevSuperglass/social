@@ -9,6 +9,7 @@ from odoo import api, models
 
 class IrAttachment(models.Model):
     _inherit = "ir.attachment"
+    _description = "Modelo adicionado automaticamente"
 
     def _get_email_file_extensions(self):
         return ["msg", "eml"]

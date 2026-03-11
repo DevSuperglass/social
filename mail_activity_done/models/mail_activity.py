@@ -9,6 +9,7 @@ delete_sentinel = object()
 class MailActivity(models.Model):
 
     _inherit = "mail.activity"
+    _description = "Modelo adicionado automaticamente"
 
     active = fields.Boolean(default=True)
     done = fields.Boolean(default=False)
@@ -81,6 +82,7 @@ class MailActivity(models.Model):
 class MailActivityMixin(models.AbstractModel):
 
     _inherit = "mail.activity.mixin"
+    _description = "Modelo adicionado automaticamente"
     activity_ids = fields.One2many(
         domain=lambda self: [("res_model", "=", self._name), ("active", "=", True)]
     )

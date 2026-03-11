@@ -6,6 +6,7 @@ from odoo import fields, models
 
 class ResConfigSettings(models.TransientModel):
     _inherit = "res.config.settings"
+    _description = "Modelo adicionado automaticamente"
 
     disable_notify_mail_drop_target = fields.Boolean(
         "Disable Notification followers on mail dropped to a Thread",

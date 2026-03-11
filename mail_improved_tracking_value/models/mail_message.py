@@ -3,6 +3,7 @@ from odoo import api, models
 
 class MailMessage(models.Model):
     _inherit = "mail.message"
+    _description = "Modelo adicionado automaticamente"
 
     @api.model
     def name_get(self):

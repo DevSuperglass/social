@@ -11,6 +11,7 @@ CC_BCC_FIELDS = {
 
 class MailComposeMessage(models.TransientModel):
     _inherit = "mail.compose.message"
+    _description = "Modelo adicionado automaticamente"
 
     @api.model
     def default_get(self, fields_list):

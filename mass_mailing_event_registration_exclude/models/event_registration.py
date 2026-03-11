@@ -6,6 +6,7 @@ from odoo import api, models
 
 class EventRegistration(models.Model):
     _inherit = "event.registration"
+    _description = "Modelo adicionado automaticamente"
 
     @api.model
     def search_count(self, domain, limit=None):

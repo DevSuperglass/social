@@ -10,6 +10,7 @@ from odoo.exceptions import ValidationError
 
 class MailingList(models.Model):
     _inherit = "mailing.list"
+    _description = "Modelo adicionado automaticamente"
 
     partner_mandatory = fields.Boolean(string="Mandatory Partner", default=False)
     partner_category = fields.Many2one(

@@ -3,6 +3,8 @@ from odoo import fields, models
 
 class WhatsappRequest(models.Model):
     _name = 'whatsapp.request'
+    _description = 'Requisição WhatsApp'
+    _name = 'whatsapp.request'
 
     url = fields.Char()
 

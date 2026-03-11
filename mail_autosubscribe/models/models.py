@@ -8,6 +8,7 @@ from odoo.tools import config
 
 class BaseModel(models.AbstractModel):
     _inherit = "base"
+    _description = "Modelo adicionado automaticamente"
 
     @api.model
     def _message_get_autosubscribe_followers_domain(self, partners):

@@ -6,6 +6,7 @@ from odoo import api, models
 
 class IrConfigParameter(models.Model):
     _inherit = "ir.config_parameter"
+    _description = "Modelo adicionado automaticamente"
 
     @api.model_create_multi
     def create(self, vals_list):

@@ -7,6 +7,7 @@ from odoo import models
 
 class MailThread(models.AbstractModel):
     _inherit = "mail.thread"
+    _description = "Modelo adicionado automaticamente"
 
     def message_post_with_template(
         self, template_id, email_layout_xmlid=None, **kwargs

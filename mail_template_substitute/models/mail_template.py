@@ -7,6 +7,7 @@ from odoo.tools.safe_eval import safe_eval
 
 class MailTemplate(models.Model):
     _inherit = "mail.template"
+    _description = "Modelo adicionado automaticamente"
 
     mail_template_substitution_rule_ids = fields.One2many(
         comodel_name="mail.template.substitution.rule",

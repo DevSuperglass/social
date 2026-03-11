@@ -11,6 +11,7 @@ from odoo.exceptions import ValidationError
 
 class ResPartner(models.Model):
     _inherit = "res.partner"
+    _description = "Modelo adicionado automaticamente"
 
     mass_mailing_contact_ids = fields.One2many(
         string="Mailing contacts",

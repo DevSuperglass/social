@@ -4,6 +4,7 @@ from odoo.tools import config
 
 class MailThread(models.AbstractModel):
     _inherit = "mail.thread"
+    _description = "Modelo adicionado automaticamente"
 
     def _message_add_suggested_recipient(
         self, result, partner=None, email=None, lang=None, reason=""

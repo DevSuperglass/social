@@ -9,6 +9,7 @@ from odoo import api, fields, models
 class MailTrackingValue(models.Model):
 
     _inherit = "mail.tracking.value"
+    _description = "Modelo adicionado automaticamente"
 
     new_value_formatted = fields.Char(
         compute="_compute_formatted_value", string="New value"

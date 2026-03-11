@@ -12,6 +12,7 @@ from odoo.osv import expression
 
 class MailThread(models.AbstractModel):
     _inherit = "mail.thread"
+    _description = "Modelo adicionado automaticamente"
 
     def _search_message_content(self, operator, value):
         model_domain = [("model", "=", self._name)]

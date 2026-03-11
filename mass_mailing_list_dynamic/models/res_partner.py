@@ -6,6 +6,7 @@ from odoo import models
 
 class ResPartner(models.Model):
     _inherit = "res.partner"
+    _description = "Modelo adicionado automaticamente"
 
     def write(self, vals):
         """Allow to write values in mass mailing contact."""

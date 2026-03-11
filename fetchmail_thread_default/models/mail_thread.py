@@ -6,6 +6,7 @@ from odoo import api, models
 
 class MailThread(models.AbstractModel):
     _inherit = "mail.thread"
+    _description = "Modelo adicionado automaticamente"
 
     @api.model
     def message_process(

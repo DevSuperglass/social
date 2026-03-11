@@ -7,6 +7,7 @@ from odoo import api, fields, models
 
 class MailMassMailingContact(models.Model):
     _name = "mailing.contact"
+    _description = "Modelo adicionado automaticamente"
     _inherit = ["mailing.contact", "mail.bounced.mixin"]
 
     email_score = fields.Float(

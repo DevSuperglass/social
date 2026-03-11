@@ -6,6 +6,7 @@ from odoo import api, fields, models
 
 class MailTemplatePreview(models.TransientModel):
     _inherit = "mail.template.preview"
+    _description = "Modelo adicionado automaticamente"
 
     _url_pattern = "/email-preview/{model}/{templ_id}/{rec_id}/"
 

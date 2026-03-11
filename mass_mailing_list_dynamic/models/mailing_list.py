@@ -8,6 +8,7 @@ from odoo.tools.safe_eval import safe_eval
 
 class MassMailingList(models.Model):
     _inherit = "mailing.list"
+    _description = "Modelo adicionado automaticamente"
 
     dynamic = fields.Boolean(
         help="Set this list as dynamic, to make it autosynchronized with "

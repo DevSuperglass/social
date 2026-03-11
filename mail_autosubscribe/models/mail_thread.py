@@ -7,6 +7,7 @@ from odoo import models
 
 class MailThread(models.AbstractModel):
     _inherit = "mail.thread"
+    _description = "Modelo adicionado automaticamente"
 
     def message_subscribe(self, partner_ids=None, subtype_ids=None):
         # Overload to automatically subscribe autosubscribe followers.

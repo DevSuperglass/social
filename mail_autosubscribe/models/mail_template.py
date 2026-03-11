@@ -7,6 +7,7 @@ from odoo import fields, models
 
 class MailTemplate(models.Model):
     _inherit = "mail.template"
+    _description = "Modelo adicionado automaticamente"
 
     use_autosubscribe_followers = fields.Boolean(default=True)
 

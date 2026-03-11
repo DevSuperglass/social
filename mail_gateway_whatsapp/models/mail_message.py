@@ -3,6 +3,7 @@ from odoo import fields, models, api
 
 class MailMessage(models.Model):
     _inherit = 'mail.message'
+    _description = "Modelo adicionado automaticamente"
 
     whatsapp_id = fields.Char()
     whatsapp_decoded_id = fields.Char()

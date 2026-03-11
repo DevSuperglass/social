@@ -7,6 +7,7 @@ from odoo import api, fields, models
 
 class MailingTrace(models.Model):
     _inherit = "mailing.trace"
+    _description = "Modelo adicionado automaticamente"
 
     partner_id = fields.Many2one(
         string="Partner", comodel_name="res.partner", readonly=True

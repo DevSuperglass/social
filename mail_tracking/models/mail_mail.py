@@ -10,6 +10,7 @@ from odoo import fields, models
 
 class MailMail(models.Model):
     _inherit = "mail.mail"
+    _description = "Modelo adicionado automaticamente"
 
     def _tracking_email_prepare(self, partner, email):
         """Prepare email.tracking.email record values"""

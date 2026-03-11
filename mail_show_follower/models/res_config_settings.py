@@ -3,6 +3,7 @@ from odoo import api, fields, models
 
 class ResConfigSettings(models.TransientModel):
     _inherit = "res.config.settings"
+    _description = "Modelo adicionado automaticamente"
 
     show_internal_users_cc = fields.Boolean(
         related="company_id.show_internal_users_cc",

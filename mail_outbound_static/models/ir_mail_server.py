@@ -11,6 +11,7 @@ from odoo.exceptions import ValidationError
 class IrMailServer(models.Model):
 
     _inherit = "ir.mail_server"
+    _description = "Modelo adicionado automaticamente"
 
     smtp_from = fields.Char(
         string="Email From",

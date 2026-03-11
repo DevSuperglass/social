@@ -6,6 +6,7 @@ from odoo import models
 
 class BasePartnerMergeAutomaticWizard(models.TransientModel):
     _inherit = "base.partner.merge.automatic.wizard"
+    _description = "Modelo adicionado automaticamente"
 
     def _merge(self, partner_ids, dst_partner=None, extra_checks=True):
         return super(

@@ -9,6 +9,7 @@ from odoo import fields, models
 
 class ResUsers(models.Model):
     _inherit = "res.users"
+    _description = "Modelo adicionado automaticamente"
 
     digital_signature = fields.Image(
         copy=False,

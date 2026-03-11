@@ -6,6 +6,7 @@ from odoo import api, fields, models
 
 class MailActivity(models.Model):
     _inherit = "mail.activity"
+    _description = "Modelo adicionado automaticamente"
 
     res_model_id_name = fields.Char(
         related="res_model_id.name", string="Origin", readonly=True

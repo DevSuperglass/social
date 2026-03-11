@@ -6,6 +6,7 @@ from odoo import fields, models
 
 class MailMassMailing(models.Model):
     _inherit = "mailing.list"
+    _description = "Modelo adicionado automaticamente"
 
     not_cross_unsubscriptable = fields.Boolean(
         string="Not cross unsubscriptable",

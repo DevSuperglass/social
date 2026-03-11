@@ -6,6 +6,7 @@ from odoo import api, models
 
 class ResPartner(models.Model):
     _inherit = "res.partner"
+    _description = "Modelo adicionado automaticamente"
 
     @api.model
     def search_count(self, domain, limit=None):

@@ -8,6 +8,7 @@ from odoo import models
 
 class MailComposer(models.TransientModel):
     _inherit = "mail.compose.message"
+    _description = "Modelo adicionado automaticamente"
 
     def _action_send_mail(self, auto_commit=False):
         # OVERRIDE to force the email_layout_xmlid defined on the mail.template

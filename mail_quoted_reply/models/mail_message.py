@@ -7,6 +7,7 @@ from odoo.tools import format_datetime
 
 class MailMessage(models.Model):
     _inherit = "mail.message"
+    _description = "Modelo adicionado automaticamente"
 
     def _prep_quoted_reply_body(self):
         return """

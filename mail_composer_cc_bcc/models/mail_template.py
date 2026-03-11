@@ -8,6 +8,7 @@ from ..wizards.mail_compose_message import CC_BCC_FIELDS
 
 class MailTemplate(models.Model):
     _inherit = "mail.template"
+    _description = "Modelo adicionado automaticamente"
 
     email_bcc = fields.Char(
         "Bcc", help="Blind cc recipients (placeholders may be used here)"

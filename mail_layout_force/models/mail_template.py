@@ -7,6 +7,7 @@ from odoo import api, fields, models
 
 class MailTemplate(models.Model):
     _inherit = "mail.template"
+    _description = "Modelo adicionado automaticamente"
 
     force_email_layout_id = fields.Many2one(
         comodel_name="ir.ui.view",

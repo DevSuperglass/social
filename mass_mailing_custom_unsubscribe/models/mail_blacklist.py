@@ -6,6 +6,7 @@ from odoo import models
 
 class MailBlackList(models.Model):
     _inherit = "mail.blacklist"
+    _description = "Modelo adicionado automaticamente"
 
     def _add(self, email):
         mailing_id = self.env.context.get("mailing_id")

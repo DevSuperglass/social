@@ -5,6 +5,7 @@ from odoo import api, fields, models
 
 class MailActivityMixin(models.AbstractModel):
     _inherit = "mail.activity.mixin"
+    _description = "Modelo adicionado automaticamente"
 
     activity_team_user_ids = fields.Many2many(
         comodel_name="res.users",

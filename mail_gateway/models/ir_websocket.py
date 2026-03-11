@@ -8,6 +8,7 @@ from odoo.addons.bus.websocket import wsrequest
 
 class IrWebsocket(models.AbstractModel):
     _inherit = "ir.websocket"
+    _description = "Modelo adicionado automaticamente"
 
     def _build_bus_channel_list(self, channels):
         req = request or wsrequest

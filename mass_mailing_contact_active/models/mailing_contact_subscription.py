@@ -6,5 +6,6 @@ from odoo import fields, models
 class MailingContactSubscription(models.Model):
 
     _inherit = "mailing.contact.subscription"
+    _description = "Modelo adicionado automaticamente"
 
     active = fields.Boolean(default=True)
