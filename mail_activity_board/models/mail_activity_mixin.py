@@ -6,7 +6,7 @@ from odoo import models
 
 class MailActivityMixin(models.AbstractModel):
     _inherit = "mail.activity.mixin"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo mail.activity.mixin"
 
     def redirect_to_activities(self, **kwargs):
         """Redirects to the list of activities of the object shown.

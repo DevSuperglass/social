@@ -10,7 +10,7 @@ from odoo.tools.safe_eval import safe_eval
 
 class MailMassMailing(models.Model):
     _inherit = "mailing.mailing"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo mailing.mailing"
 
     def update_opt_out(self, email, list_ids, value):
         """Save unsubscription reason when opting out from mailing."""

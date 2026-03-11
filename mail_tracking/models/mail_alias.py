@@ -6,7 +6,7 @@ from odoo import api, models, tools
 
 class MailAlias(models.Model):
     _inherit = "mail.alias"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo mail.alias"
 
     @api.model
     @tools.ormcache()

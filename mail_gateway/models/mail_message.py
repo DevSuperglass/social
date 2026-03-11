@@ -8,7 +8,7 @@ from odoo import api, fields, models
 class MailMessage(models.Model):
 
     _inherit = "mail.message"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo mail.message"
 
     gateway_type = fields.Selection(
         selection=lambda r: r.env["mail.gateway"]._fields["gateway_type"].selection

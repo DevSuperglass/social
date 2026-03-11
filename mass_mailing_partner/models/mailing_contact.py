@@ -12,7 +12,7 @@ from odoo.exceptions import ValidationError
 
 class MailingContact(models.Model):
     _inherit = "mailing.contact"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo mailing.contact"
 
     partner_id = fields.Many2one(
         comodel_name="res.partner", string="Partner", domain=[("email", "!=", False)]

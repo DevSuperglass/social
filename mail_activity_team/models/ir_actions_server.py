@@ -7,7 +7,7 @@ from odoo import fields, models
 
 class IrActionsServer(models.Model):
     _inherit = "ir.actions.server"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo ir.actions.server"
 
     activity_team_id = fields.Many2one(
         "mail.activity.team",

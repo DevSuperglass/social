@@ -6,7 +6,7 @@ from odoo import fields, models
 
 class Company(models.Model):
     _inherit = "res.company"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo res.company"
 
     default_partner_cc_ids = fields.Many2many(
         "res.partner",

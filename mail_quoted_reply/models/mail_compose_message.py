@@ -5,7 +5,7 @@ from odoo import api, models, tools
 
 class MailComposeMessage(models.TransientModel):
     _inherit = "mail.compose.message"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo mail.compose.message"
 
     @api.onchange("template_id")
     def _onchange_template_id_wrapper(self):

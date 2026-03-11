@@ -7,7 +7,7 @@ from odoo import api, models
 
 class MassMailingContact(models.Model):
     _inherit = "mailing.contact"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo mailing.contact"
 
     @api.model
     def search_count(self, domain, limit=None):

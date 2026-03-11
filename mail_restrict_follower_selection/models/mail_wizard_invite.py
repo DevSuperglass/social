@@ -12,7 +12,7 @@ from odoo.tools.safe_eval import safe_eval
 
 class MailWizardInvite(models.TransientModel):
     _inherit = "mail.wizard.invite"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo mail.wizard.invite"
 
     @api.model
     def _mail_restrict_follower_selection_get_domain(self, res_model=None):

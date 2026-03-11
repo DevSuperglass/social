@@ -10,7 +10,7 @@ from odoo.addons.phone_validation.tools import phone_validation
 class MailThread(models.AbstractModel):
 
     _inherit = "mail.thread"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo mail.thread"
 
     def _get_whatsapp_channel_vals(self, token, gateway, partner):
         result = {

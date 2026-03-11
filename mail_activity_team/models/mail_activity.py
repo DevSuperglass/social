@@ -7,7 +7,7 @@ from odoo.exceptions import ValidationError
 
 class MailActivity(models.Model):
     _inherit = "mail.activity"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo mail.activity"
 
     def _get_default_team_id(self, user_id=None):
         if not user_id:

@@ -5,7 +5,7 @@ from odoo import api, fields, models, modules
 
 class ResUsers(models.Model):
     _inherit = "res.users"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo res.users"
 
     activity_team_ids = fields.Many2many(
         comodel_name="mail.activity.team",

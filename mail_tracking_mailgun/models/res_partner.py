@@ -16,7 +16,7 @@ from ..wizards.res_config_settings import MAILGUN_TIMEOUT
 
 class ResPartner(models.Model):
     _inherit = "res.partner"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo res.partner"
 
     def email_bounced_set(self, tracking_emails, reason, event=None):
         res = super().email_bounced_set(tracking_emails, reason, event=event)

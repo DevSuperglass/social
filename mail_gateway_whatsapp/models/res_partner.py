@@ -6,7 +6,7 @@ from odoo import models
 
 class ResPartner(models.Model):
     _name = "res.partner"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Modelo principal para res.partner"
     _inherit = ["mail.thread.phone", "res.partner"]
 
     def _whatsapp_get_partner(self):

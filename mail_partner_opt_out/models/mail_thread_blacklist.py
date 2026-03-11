@@ -3,7 +3,7 @@ from odoo import models
 
 class MailBlackListMixin(models.AbstractModel):
     _inherit = "mail.thread.blacklist"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo mail.thread.blacklist"
 
     def mail_blacklist_add(self):
         for rec in self:

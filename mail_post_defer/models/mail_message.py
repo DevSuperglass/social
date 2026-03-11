@@ -6,7 +6,7 @@ from odoo import models
 
 class MailMessage(models.Model):
     _inherit = "mail.message"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo mail.message"
 
     def _cleanup_side_records(self):
         """Delete pending outgoing mails."""

@@ -6,7 +6,7 @@ from odoo import fields, models
 
 class MailNotification(models.Model):
     _inherit = "mail.notification"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo mail.notification"
 
     gateway_channel_id = fields.Many2one("mail.channel")
     notification_type = fields.Selection(

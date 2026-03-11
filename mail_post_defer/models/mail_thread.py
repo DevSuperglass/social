@@ -9,7 +9,7 @@ from odoo.exceptions import UserError
 
 class MailThread(models.AbstractModel):
     _inherit = "mail.thread"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo mail.thread"
 
     def _notify_thread(self, message, msg_vals=False, **kwargs):
         """Defer emails by default."""

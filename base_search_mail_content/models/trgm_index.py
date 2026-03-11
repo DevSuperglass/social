@@ -9,7 +9,7 @@ from odoo import fields, models
 
 class TrgmIndex(models.Model):
     _inherit = "trgm.index"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo trgm.index"
 
     # We take advantage of field inheritance to redefine help instead of do
     # inheritance in views that throws an error

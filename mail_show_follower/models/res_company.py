@@ -3,7 +3,7 @@ from odoo import fields, models
 
 class ResCompany(models.Model):
     _inherit = "res.company"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo res.company"
 
     show_internal_users_cc = fields.Boolean(
         string="Show Internal Users CC",

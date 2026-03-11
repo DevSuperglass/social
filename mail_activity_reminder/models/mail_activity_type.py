@@ -8,7 +8,7 @@ from odoo import fields, models
 
 class MailActivityType(models.Model):
     _inherit = "mail.activity.type"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo mail.activity.type"
 
     reminders = fields.Char(
         help=(

@@ -5,7 +5,7 @@ from odoo import fields, models, tools
 
 class MailTemplate(models.Model):
     _inherit = "mail.template"
-    _description = "Modelo adicionado automaticamente"
+    _description = "Extensão do modelo mail.template"
 
     body_type = fields.Selection(
         [("qweb", "QWeb"), ("qweb_view", "QWeb View")],
