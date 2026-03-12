@@ -8,7 +8,7 @@ from odoo import models
 
 class IrMailServer(models.Model):
     _inherit = "ir.mail_server"
-    _description = "Extensão do modelo ir.mail_server"
+    _description = "Extensão de Ir Mail_Server (Social)"
 
     def _tracking_headers_add(self, tracking_email_id, headers):
         headers = super()._tracking_headers_add(tracking_email_id, headers)

@@ -5,7 +5,7 @@ from odoo import api, fields, models
 
 class MailActivity(models.Model):
     _inherit = "mail.activity"
-    _description = "Extensão do modelo mail.activity"
+    _description = "Extensão de Mail Activity (Social)"
 
     partner_id = fields.Many2one(
         comodel_name="res.partner",

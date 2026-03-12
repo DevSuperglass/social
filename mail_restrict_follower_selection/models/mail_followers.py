@@ -7,7 +7,7 @@ from odoo.tools import config
 
 class MailFollowers(models.Model):
     _inherit = "mail.followers"
-    _description = "Extensão do modelo mail.followers"
+    _description = "Extensão de Mail Followers (Social)"
 
     def _add_followers(
         self,

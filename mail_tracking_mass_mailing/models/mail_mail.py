@@ -7,7 +7,7 @@ from odoo import api, models
 
 class MailMail(models.Model):
     _inherit = "mail.mail"
-    _description = "Extensão do modelo mail.mail"
+    _description = "Extensão de Mail Mail (Social)"
 
     @api.model
     def _tracking_email_prepare(self, partner, email):

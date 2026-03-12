@@ -6,7 +6,7 @@ from odoo import fields, models
 class MailGateway(models.Model):
 
     _inherit = "mail.gateway"
-    _description = "Extensão do modelo mail.gateway"
+    _description = "Extensão de Mail Gateway (Social)"
 
     telegram_security_key = fields.Char()
     gateway_type = fields.Selection(

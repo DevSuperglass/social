@@ -6,7 +6,7 @@ from odoo import fields, models
 class MailingContact(models.Model):
 
     _inherit = "mailing.contact"
-    _description = "Extensão do modelo mailing.contact"
+    _description = "Extensão de Mailing Contact (Social)"
 
     active = fields.Boolean(default=True)
 

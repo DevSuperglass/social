@@ -7,7 +7,7 @@ from odoo import api, fields, models
 
 class MailTrackingEvent(models.Model):
     _inherit = "mail.tracking.event"
-    _description = "Extensão do modelo mail.tracking.event"
+    _description = "Extensão de Mail Tracking Event (Social)"
 
     mass_mailing_id = fields.Many2one(
         string="Mass mailing",

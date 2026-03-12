@@ -6,7 +6,7 @@ from odoo import models
 
 class BasePartnerMergeAutomaticWizard(models.TransientModel):
     _inherit = "base.partner.merge.automatic.wizard"
-    _description = "Extensão do modelo base.partner.merge.automatic.wizard"
+    _description = "Extensão de Base Partner Merge Automatic Wizard (Social)"
 
     def _merge(self, partner_ids, dst_partner=None, extra_checks=True):
         if dst_partner:

@@ -11,7 +11,7 @@ from odoo.exceptions import ValidationError
 class IrMailServer(models.Model):
 
     _inherit = "ir.mail_server"
-    _description = "Extensão do modelo ir.mail_server"
+    _description = "Extensão de Ir Mail_Server (Social)"
 
     smtp_from = fields.Char(
         string="Email From",

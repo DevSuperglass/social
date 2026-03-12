@@ -6,7 +6,7 @@ from odoo import api, models
 
 class MailThread(models.AbstractModel):
     _inherit = "mail.thread"
-    _description = "Extensão do modelo mail.thread"
+    _description = "Extensão de Mail Thread (Social)"
 
     @api.model
     def message_process(

@@ -8,7 +8,7 @@ from odoo import fields, models
 
 class MassMailing(models.Model):
     _inherit = "mailing.mailing"
-    _description = "Extensão do modelo mailing.mailing"
+    _description = "Extensão de Mailing Mailing (Social)"
 
     def event_filtered_ids(self, model, mailing_mailing_id, domain, field="email"):
         field = field or "email"

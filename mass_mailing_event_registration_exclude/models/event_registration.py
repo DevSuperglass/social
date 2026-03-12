@@ -6,7 +6,7 @@ from odoo import api, models
 
 class EventRegistration(models.Model):
     _inherit = "event.registration"
-    _description = "Extensão do modelo event.registration"
+    _description = "Extensão de Event Registration (Social)"
 
     @api.model
     def search_count(self, domain, limit=None):

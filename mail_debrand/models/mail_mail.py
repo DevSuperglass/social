@@ -7,7 +7,7 @@ from odoo import models
 
 class MailMail(models.AbstractModel):
     _inherit = "mail.mail"
-    _description = "Extensão do modelo mail.mail"
+    _description = "Extensão de Mail Mail (Social)"
 
     def _send_prepare_body(self):
         body_html = super()._send_prepare_body()

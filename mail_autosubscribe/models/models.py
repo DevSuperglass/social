@@ -8,7 +8,7 @@ from odoo.tools import config
 
 class BaseModel(models.AbstractModel):
     _inherit = "base"
-    _description = "Extensão do modelo base"
+    _description = "Extensão de Base (Social)"
 
     @api.model
     def _message_get_autosubscribe_followers_domain(self, partners):

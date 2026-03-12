@@ -11,7 +11,7 @@ from odoo.tools import email_split, email_split_and_format
 
 class MailThread(models.AbstractModel):
     _inherit = "mail.thread"
-    _description = "Extensão do modelo mail.thread"
+    _description = "Extensão de Mail Thread (Social)"
 
     failed_message_ids = fields.One2many(
         "mail.message",

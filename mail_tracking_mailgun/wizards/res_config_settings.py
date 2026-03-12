@@ -25,7 +25,7 @@ MAILGUN_TIMEOUT = 10
 
 class ResConfigSettings(models.TransientModel):
     _inherit = "res.config.settings"
-    _description = "Extensão do modelo res.config.settings"
+    _description = "Extensão de Res Config Settings (Social)"
 
     mail_tracking_mailgun_enabled = fields.Boolean(
         string="Enable mail tracking with Mailgun",

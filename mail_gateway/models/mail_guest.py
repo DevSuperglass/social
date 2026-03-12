@@ -6,7 +6,7 @@ from odoo import fields, models
 
 class MailGuest(models.Model):
     _inherit = "mail.guest"
-    _description = "Extensão do modelo mail.guest"
+    _description = "Extensão de Mail Guest (Social)"
 
     gateway_id = fields.Many2one("mail.gateway")
     gateway_token = fields.Char()

@@ -6,7 +6,7 @@ from odoo import api, fields, models
 
 class MailTemplatePreview(models.TransientModel):
     _inherit = "mail.template.preview"
-    _description = "Extensão do modelo mail.template.preview"
+    _description = "Extensão de Mail Template Preview (Social)"
 
     _url_pattern = "/email-preview/{model}/{templ_id}/{rec_id}/"
 

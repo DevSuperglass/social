@@ -3,7 +3,7 @@ from odoo import models
 
 class ResPartner(models.Model):
     _inherit = "res.partner"
-    _description = "Extensão do modelo res.partner"
+    _description = "Extensão de Res Partner (Social)"
 
     def _filter_shown_in_cc(self, show_internal_users):
         """Get partners that should be displayed as CC on mails."""

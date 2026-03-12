@@ -8,7 +8,7 @@ from odoo import models
 
 class MailingList(models.Model):
     _inherit = "mailing.list"
-    _description = "Extensão do modelo mailing.list"
+    _description = "Extensão de Mailing List (Social)"
 
     _sql_constraints = [
         (

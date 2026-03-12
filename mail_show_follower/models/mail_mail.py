@@ -5,7 +5,7 @@ from odoo import api, models, tools
 
 class MailMail(models.Model):
     _inherit = "mail.mail"
-    _description = "Extensão do modelo mail.mail"
+    _description = "Extensão de Mail Mail (Social)"
 
     @api.model
     def _build_cc_text(self, partners):

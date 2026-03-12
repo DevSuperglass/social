@@ -6,7 +6,7 @@ from odoo import api, fields, models
 
 class ResPartner(models.Model):
     _name = "res.partner"
-    _description = "Modelo principal para res.partner"
+    _description = "Gerenciamento de Res Partner (Social)"
     _inherit = ["res.partner", "mail.bounced.mixin"]
 
     # tracking_emails_count and email_score are non-store fields in order

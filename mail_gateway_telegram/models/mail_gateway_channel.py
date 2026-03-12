@@ -10,7 +10,7 @@ from odoo.addons.base.models.avatar_mixin import get_hsl_from_seed
 class MailChannel(models.Model):
 
     _inherit = "mail.channel"
-    _description = "Extensão do modelo mail.channel"
+    _description = "Extensão de Mail Channel (Social)"
 
     def _generate_avatar_gateway(self):
         if self.gateway_id.gateway_type == "telegram":

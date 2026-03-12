@@ -16,7 +16,7 @@ except (ImportError, IOError) as err:  # pragma: no cover
 
 class MailTemplate(models.Model):
     _inherit = "mail.template"
-    _description = "Extensão do modelo mail.template"
+    _description = "Extensão de Mail Template (Social)"
 
     def _render_template_postprocess(self, rendered):
         rendered = super()._render_template_postprocess(rendered)

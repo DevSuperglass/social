@@ -6,7 +6,7 @@ from odoo import fields, models
 
 class MailMessage(models.Model):
     _inherit = "mail.message"
-    _description = "Extensão do modelo mail.message"
+    _description = "Extensão de Mail Message (Social)"
 
     recipient_cc_ids = fields.Many2many(
         "res.partner",

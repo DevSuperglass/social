@@ -25,7 +25,7 @@ def format_emails(partners):
 
 class MailMail(models.Model):
     _inherit = "mail.mail"
-    _description = "Extensão do modelo mail.mail"
+    _description = "Extensão de Mail Mail (Social)"
 
     email_bcc = fields.Char("Bcc", help="Blind Cc message recipients")
 

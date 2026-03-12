@@ -8,7 +8,7 @@ from odoo.tools.safe_eval import safe_eval, time
 
 class MailTemplate(models.Model):
     _inherit = "mail.template"
-    _description = "Extensão do modelo mail.template"
+    _description = "Extensão de Mail Template (Social)"
 
     template_report_ids = fields.One2many(
         comodel_name="mail.template.report",

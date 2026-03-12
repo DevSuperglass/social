@@ -6,7 +6,7 @@ from odoo import fields, models
 
 class MailComposeMessage(models.TransientModel):
     _inherit = "mail.compose.message"
-    _description = "Extensão do modelo mail.compose.message"
+    _description = "Extensão de Mail Compose Message (Social)"
 
     notify_followers = fields.Boolean(default=True)
 

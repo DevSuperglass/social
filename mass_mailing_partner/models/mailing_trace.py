@@ -7,7 +7,7 @@ from odoo import api, fields, models
 
 class MailingTrace(models.Model):
     _inherit = "mailing.trace"
-    _description = "Extensão do modelo mailing.trace"
+    _description = "Extensão de Mailing Trace (Social)"
 
     partner_id = fields.Many2one(
         string="Partner", comodel_name="res.partner", readonly=True

@@ -6,7 +6,7 @@ from odoo import models
 
 class MailBlackList(models.Model):
     _inherit = "mail.blacklist"
-    _description = "Extensão do modelo mail.blacklist"
+    _description = "Extensão de Mail Blacklist (Social)"
 
     def _add(self, email):
         mailing_id = self.env.context.get("mailing_id")

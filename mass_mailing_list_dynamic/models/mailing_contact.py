@@ -9,7 +9,7 @@ from odoo.exceptions import ValidationError
 
 class MassMailingContact(models.Model):
     _inherit = "mailing.contact"
-    _description = "Extensão do modelo mailing.contact"
+    _description = "Extensão de Mailing Contact (Social)"
 
     @api.constrains("partner_id", "list_ids", "name", "email")
     def _check_no_manual_edits_on_fully_synced_lists(self):

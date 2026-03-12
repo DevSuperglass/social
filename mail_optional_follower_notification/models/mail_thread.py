@@ -6,7 +6,7 @@ from odoo import models
 
 class MailThread(models.AbstractModel):
     _inherit = "mail.thread"
-    _description = "Extensão do modelo mail.thread"
+    _description = "Extensão de Mail Thread (Social)"
 
     def _notify_get_recipients(self, message, msg_vals, **kwargs):
         """Compute recipients to notify based on subtype and followers. This

@@ -6,7 +6,7 @@ from odoo import models
 
 class MailMessageSchedule(models.Model):
     _inherit = "mail.message.schedule"
-    _description = "Extensão do modelo mail.message.schedule"
+    _description = "Extensão de Mail Message Schedule (Social)"
 
     def _send_notifications(self, default_notify_kwargs=None):
         """Avoid deferring notifications when they should be sent."""

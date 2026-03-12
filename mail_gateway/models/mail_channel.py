@@ -8,7 +8,7 @@ from odoo import api, fields, models
 
 class MailChannel(models.Model):
     _inherit = "mail.channel"
-    _description = "Extensão do modelo mail.channel"
+    _description = "Extensão de Mail Channel (Social)"
 
     gateway_channel_token = fields.Char()
     anonymous_name = fields.Char()  # Same field we will use on im_livechat

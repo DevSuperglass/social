@@ -4,7 +4,7 @@ from odoo.tools import config
 
 class MailThread(models.AbstractModel):
     _inherit = "mail.thread"
-    _description = "Extensão do modelo mail.thread"
+    _description = "Extensão de Mail Thread (Social)"
 
     def _message_add_suggested_recipient(
         self, result, partner=None, email=None, lang=None, reason=""

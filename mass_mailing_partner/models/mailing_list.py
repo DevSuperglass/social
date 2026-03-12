@@ -10,7 +10,7 @@ from odoo.exceptions import ValidationError
 
 class MailingList(models.Model):
     _inherit = "mailing.list"
-    _description = "Extensão do modelo mailing.list"
+    _description = "Extensão de Mailing List (Social)"
 
     partner_mandatory = fields.Boolean(string="Mandatory Partner", default=False)
     partner_category = fields.Many2one(

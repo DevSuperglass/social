@@ -9,7 +9,7 @@ from odoo import api, models
 
 class IrAttachment(models.Model):
     _inherit = "ir.attachment"
-    _description = "Extensão do modelo ir.attachment"
+    _description = "Extensão de Ir Attachment (Social)"
 
     def _get_email_file_extensions(self):
         return ["msg", "eml"]

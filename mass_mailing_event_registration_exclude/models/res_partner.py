@@ -6,7 +6,7 @@ from odoo import api, models
 
 class ResPartner(models.Model):
     _inherit = "res.partner"
-    _description = "Extensão do modelo res.partner"
+    _description = "Extensão de Res Partner (Social)"
 
     @api.model
     def search_count(self, domain, limit=None):

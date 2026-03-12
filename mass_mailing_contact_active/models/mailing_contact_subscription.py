@@ -6,6 +6,6 @@ from odoo import fields, models
 class MailingContactSubscription(models.Model):
 
     _inherit = "mailing.contact.subscription"
-    _description = "Extensão do modelo mailing.contact.subscription"
+    _description = "Extensão de Mailing Contact Subscription (Social)"
 
     active = fields.Boolean(default=True)

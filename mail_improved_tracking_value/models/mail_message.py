@@ -3,7 +3,7 @@ from odoo import api, models
 
 class MailMessage(models.Model):
     _inherit = "mail.message"
-    _description = "Extensão do modelo mail.message"
+    _description = "Extensão de Mail Message (Social)"
 
     @api.model
     def name_get(self):

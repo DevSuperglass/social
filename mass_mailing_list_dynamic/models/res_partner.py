@@ -6,7 +6,7 @@ from odoo import models
 
 class ResPartner(models.Model):
     _inherit = "res.partner"
-    _description = "Extensão do modelo res.partner"
+    _description = "Extensão de Res Partner (Social)"
 
     def write(self, vals):
         """Allow to write values in mass mailing contact."""

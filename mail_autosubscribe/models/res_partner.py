@@ -7,7 +7,7 @@ from odoo import fields, models
 
 class ResPartner(models.Model):
     _inherit = "res.partner"
-    _description = "Extensão do modelo res.partner"
+    _description = "Extensão de Res Partner (Social)"
 
     mail_autosubscribe_ids = fields.Many2many(
         "mail.autosubscribe",

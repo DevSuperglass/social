@@ -5,7 +5,7 @@ from odoo import api, fields, models, modules
 
 class ResUsers(models.Model):
     _inherit = "res.users"
-    _description = "Extensão do modelo res.users"
+    _description = "Extensão de Res Users (Social)"
 
     activity_team_ids = fields.Many2many(
         comodel_name="mail.activity.team",

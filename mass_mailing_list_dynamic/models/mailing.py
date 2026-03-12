@@ -7,7 +7,7 @@ from odoo import models
 
 class MassMailing(models.Model):
     _inherit = "mailing.mailing"
-    _description = "Extensão do modelo mailing.mailing"
+    _description = "Extensão de Mailing Mailing (Social)"
 
     def _get_remaining_recipients(self):
         """When evaluating remaining recipients we must resync the list in

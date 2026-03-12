@@ -10,7 +10,7 @@ from odoo import fields, models
 
 class MailMail(models.Model):
     _inherit = "mail.mail"
-    _description = "Extensão do modelo mail.mail"
+    _description = "Extensão de Mail Mail (Social)"
 
     def _tracking_email_prepare(self, partner, email):
         """Prepare email.tracking.email record values"""

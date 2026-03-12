@@ -6,7 +6,7 @@ from odoo import api, models
 
 class IrConfigParameter(models.Model):
     _inherit = "ir.config_parameter"
-    _description = "Extensão do modelo ir.config_parameter"
+    _description = "Extensão de Ir Config_Parameter (Social)"
 
     @api.model_create_multi
     def create(self, vals_list):
