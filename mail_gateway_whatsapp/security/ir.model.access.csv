@@ -1,3 +1,4 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_whatsapp_composer,access.whatsapp.composer,model_whatsapp_composer,base.group_user,1,1,1,0
 access_whatsapp_request,access.whatsapp.request,model_whatsapp_request,mail_gateway.gateway_user,1,1,1,0
+access_mail_gateway_whitelist,access.mail.gateway.whitelist,model_mail_gateway_whitelist,mail_gateway.gateway_user,1,1,1,1

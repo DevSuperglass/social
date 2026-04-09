@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+
+    <record id="mail_gateway_whitelist_action" model="ir.actions.act_window">
+        <field name="name">Whitelist de Gateway</field>
+        <field name="res_model">mail.gateway.whitelist</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="mail_gateway_whitelist_tree" model="ir.ui.view">
+        <field name="name">mail.gateway.whitelist.tree</field>
+        <field name="model">mail.gateway.whitelist</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name" string="Nome"/>
+                <field name="gateway_id" string="Gateway"/>
+                <field name="partner_ids" string="Partners" widget="many2many_tags"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="mail_gateway_whitelist_form" model="ir.ui.view">
+        <field name="name">mail.gateway.whitelist.form</field>
+        <field name="model">mail.gateway.whitelist</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name" string="Nome da Ação"/>
+                    </group>
+                    <group string="Configuração">
+                        <field name="gateway_id" string="Gateway" options="{'no_create': True}"/>
+                        <field name="partner_ids" widget="many2many_tags" string="Partners" options="{'no_create': True}"/>
+                    </group>
+                    <notebook>
+                        <page string="Código Python">
+                            <field name="code" widget="ace" options="{'mode': 'python'}"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <menuitem
+        id="mail_gateway_whitelist_menuitem"
+        name="Whitelist"
+        action="mail_gateway_whitelist_action"
+        parent="mail_gateway.mail_gateway_menu"
+        sequence="4"
+    />
+
+</odoo>

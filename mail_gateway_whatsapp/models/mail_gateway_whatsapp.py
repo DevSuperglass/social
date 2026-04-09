@@ -83,9 +83,33 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         if message_id:
                             self._set_queue(chat, message_id)
                         # self._get_crm_meta(message.get("from"))
-                        if message.get("type") != "button":
-                            continue
-                        self._process_button(message.get("button", {}).get("payload"), message)
+                        if message.get("type") == "button":
+                            self._process_button(message.get("button", {}).get("payload"), message)
+                        # TODO refatorar para modulo bridge
+                        elif message_id and chat.attendance_type != 'human':
+                            self._apply_whitelist_rule(chat, message_id)
+
+    def _apply_whitelist_rule(self, channel, message_id):
+        """
+        Verifica se o gateway do canal possui uma regra de whitelist ativa
+        para o partner remetente e, caso positivo, executa o código associado.
+        """
+        rules = self.env['mail.gateway.whitelist'].search([
+            ('gateway_id', '=', channel.gateway_id.id),
+            ('code', '!=', False),
+        ])
+        if not rules:
+            return
+
+        partner = self.env['res.partner.gateway.channel'].search(
+            [('gateway_token', '=', channel.gateway_channel_token)],
+            limit=1,
+        ).partner_id
+
+        for rule in rules:
+            if partner in rule.partner_ids:
+                rule.execute(channel, message_id)
+                break
 
     @staticmethod
     def convert_audio(content):
@@ -232,7 +256,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             self._send_attendance_start(mobile=channel_id.gateway_channel_token)
 
     def _send_attendance_start(self, mobile):
-        self.with_context({'is_internal': True})._send_tmpl_message(
+        self.with_context({'is_internal': True}).send_tmpl_message(
             tmpl_name=None,
             gateway_phone='335789752960181',
             components="Seu atendimento será iniciado em breve",
@@ -520,7 +544,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
         # By default, it does nothing.
         return {}
 
-    def _send_tmpl_message(self, gateway_phone, tmpl_name, components, mobile_list, body_message):
+    def send_tmpl_message(self, gateway_phone, tmpl_name, components, mobile_list, body_message):
         gateway = self.env['mail.gateway'].search([('whatsapp_from_phone', '=', gateway_phone)], limit=1)
         tmpl_id = self.env['whatsapp.template'].search([('name', '=', tmpl_name)], limit=1)
 
@@ -563,6 +587,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'json': json,
                 'mail_message_id': message.id,
             })
+        return True
 
     def create_message(self, mobile, body_message, gateway_id):
         channel = self.env['mail.channel'].search([

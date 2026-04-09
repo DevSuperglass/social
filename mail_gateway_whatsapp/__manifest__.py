@@ -16,7 +16,8 @@
         "data/whatsapp_request_response_null_cron.xml",
         "wizards/whatsapp_composer.xml",
         "views/mail_gateway.xml",
-        "views/whatsapp_request_view.xml"
+        "views/whatsapp_request_view.xml",
+        "views/mail_gateway_whitelist.xml"
     ],
     "assets": {
         "mail.assets_messaging": [
