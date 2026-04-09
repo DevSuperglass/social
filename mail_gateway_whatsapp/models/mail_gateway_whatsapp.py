@@ -80,14 +80,17 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         if not chat:
                             continue
                         message_id = self._process_update(chat, message, change["value"])
+                        queue_created = False
                         if message_id:
-                            self._set_queue(chat, message_id)
+                            queue_created = self._set_queue(chat, message_id)
                         # self._get_crm_meta(message.get("from"))
                         if message.get("type") == "button":
                             self._process_button(message.get("button", {}).get("payload"), message)
                         # TODO refatorar para modulo bridge
                         elif message_id and chat.attendance_type != 'human':
                             self._apply_whitelist_rule(chat, message_id)
+                        if queue_created and chat.attendance_type == 'human':
+                            self._send_attendance_start(mobile=chat.gateway_channel_token)
 
     def _apply_whitelist_rule(self, channel, message_id):
         """
@@ -236,6 +239,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
     def _set_queue(self, channel_id, message_id):
         """
             Criação de atendimento.
+            Retorna True se uma nova fila foi criada, False caso contrário.
         """
 
         if not channel_id.queue_id and channel_id.gateway_id.whatsapp_from_phone == '335789752960181':
@@ -256,7 +260,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 }).id,
                 'queue_priority': int(partner_id.priority_rating)
             })
-            self._send_attendance_start(mobile=channel_id.gateway_channel_token)
+            return True
+        return False
 
     def _send_attendance_start(self, mobile):
         self.with_context({'is_internal': True}).send_tmpl_message(
