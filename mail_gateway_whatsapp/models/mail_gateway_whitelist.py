@@ -24,5 +24,5 @@ class MailGatewayWhitelist(models.Model):
         """Executa o método definido no formato 'model.nome_metodo' sobre o canal."""
         if not self.code:
             return
-        method_name = self.code.strip().removeprefix('model.').strip()
+        method_name = self.code.strip().rstrip('()').split('.')[-1].strip()
         getattr(channel, method_name)(message_id)
