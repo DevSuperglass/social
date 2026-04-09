@@ -99,6 +99,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             ('code', '!=', False),
         ])
         if not rules:
+            channel.write({'attendance_type': 'human'})
             return
 
         partner = self.env['res.partner.gateway.channel'].search(
@@ -109,7 +110,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
         for rule in rules:
             if partner in rule.partner_ids:
                 rule.execute(channel, message_id)
-                break
+                return
+
+        channel.write({'attendance_type': 'human'})
 
     @staticmethod
     def convert_audio(content):
