@@ -1,5 +1,4 @@
 from odoo import fields, models
-from odoo.tools.safe_eval import safe_eval
 
 
 class MailGatewayWhitelist(models.Model):
@@ -22,12 +21,8 @@ class MailGatewayWhitelist(models.Model):
     code = fields.Text(string='Código Python')
 
     def execute(self, channel, message_id):
-        """Executa o código da regra com o contexto do canal e da mensagem."""
+        """Executa o método definido no formato 'model.nome_metodo' sobre o canal."""
         if not self.code:
             return
-        local_ctx = {
-            'env': self.env,
-            'channel': channel,
-            'message_id': message_id,
-        }
-        safe_eval(self.code, local_ctx, mode='exec', nocopy=True)
+        method_name = self.code.strip().removeprefix('model.').strip()
+        getattr(channel, method_name)(message_id)
