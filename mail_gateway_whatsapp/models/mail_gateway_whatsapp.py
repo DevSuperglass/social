@@ -249,7 +249,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 ],
                 limit=1
             ).partner_id
-            bot_user = channel_id.gateway_id.webhook_user_id
+            bot_user = self.env['res.users'].sudo().search([('login', '=', 'superglassbot')], limit=1)
             channel_id.write({
                 'queue_id': self.env['quotation.queue'].sudo().create({
                     'channel_id': channel_id.id,
