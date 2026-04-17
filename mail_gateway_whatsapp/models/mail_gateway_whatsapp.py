@@ -262,6 +262,11 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 }).id,
                 'queue_priority': int(partner_id.priority_rating)
             })
+            channel_id.message_post(
+                body='<b>Atendimento iniciado pelo Bot</b>',
+                message_type='notification',
+                subtype_xmlid='mail.mt_note',
+            )
             return True
         return False
 
