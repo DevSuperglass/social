@@ -130,7 +130,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
     def _transcribe_audio(self, audio_bytes: bytes) -> str:
         """Transcreve áudio MP3 via Groq Whisper API. Retorna string vazia em caso de falha."""
-        api_key = self.env['ir.config_parameter'].sudo().get_param('cotacoes.groq_api_key', '')
+        api_key = self.env['ir.config_parameter'].sudo().get_param('mail_gateway_whatsapp.groq_api_key', '')
         if not api_key:
             return ''
         try:

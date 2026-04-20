@@ -6,3 +6,4 @@ from . import mail_gateway_whatsapp
 from . import mail_channel
 from . import res_partner
 from . import mail_gateway_whitelist
+from . import res_config_settings
