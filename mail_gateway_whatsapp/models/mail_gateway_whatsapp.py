@@ -83,9 +83,11 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         if message_id:
                             self._set_queue(chat, message_id)
                         # self._get_crm_meta(message.get("from"))
-                        if message.get("type") != "button":
-                            continue
-                        self._process_button(message.get("button", {}).get("payload"), message)
+                        if message.get("type") == "button":
+                            self._process_button(message.get("button", {}).get("payload"), message)
+                        # TODO refatorar para modulo bridge
+                        elif message_id and chat.attendance_type != 'human':
+                            chat._dispatch_to_ai_agent(message_id)
 
     @staticmethod
     def convert_audio(content):
@@ -97,6 +99,26 @@ class MailGatewayWhatsappService(models.AbstractModel):
         converted_content = mp3_io.getvalue()
 
         return converted_content
+
+    def _transcribe_audio(self, audio_bytes: bytes) -> str:
+        """Transcreve áudio MP3 via Groq Whisper API. Retorna string vazia em caso de falha."""
+        api_key = self.env['ir.config_parameter'].sudo().get_param('cotacoes.groq_api_key', '')
+        if not api_key:
+            return ''
+        try:
+            from io import BytesIO as _BytesIO
+            resp = requests.post(
+                'https://api.groq.com/openai/v1/audio/transcriptions',
+                headers={'Authorization': f'Bearer {api_key}'},
+                files={'file': ('audio.mp3', _BytesIO(audio_bytes), 'audio/mpeg')},
+                data={'model': 'whisper-large-v3', 'language': 'pt', 'response_format': 'text'},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            return resp.text.strip()
+        except Exception:
+            _logger.exception('Erro ao transcrever áudio via Groq')
+            return ''
 
     def base64_decode(self, base64_string):
         pattern = re.compile(b'^\x1c\x18(?:\x0c|\r)(\d+)\x15\x02\x00(.)\x18(.)([A-Z0-9]+)\x00$')
@@ -118,6 +140,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
         chat.ensure_one()
         body = ""
         attachments = []
+        transcription = ''
         if message.get("text"):
             body = message.get("text").get("body")
         if message.get("payload_text"):
@@ -163,6 +186,9 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 if key == 'audio':
                     attachment_json['mime_type'] = 'audio/mpeg'
                     converted_audio = self.convert_audio(content=attachment_request.content)
+                    transcription = self._transcribe_audio(converted_audio)
+                    if transcription:
+                        body = transcription
 
                 attachments.append(
                     (
@@ -201,6 +227,12 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 whatsapp_id=message.get("id")
             )
             self._post_process_message(new_message, chat)
+            if transcription:
+                chat.with_context({'no_gateway_notification': True}).message_post(
+                    body=f'<b>Áudio transcrito:</b><br/><br/>{transcription}',
+                    message_type='notification',
+                    subtype_xmlid='mail.mt_note',
+                )
             return new_message
         else:
             _logger.warning("JSON DA MENSAGEM VAZIA: " + str(message))
