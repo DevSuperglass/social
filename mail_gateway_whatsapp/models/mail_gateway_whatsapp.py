@@ -151,6 +151,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 json={'audio_url': audio_url, 'language_code': 'pt', 'language_detection': False},
                 timeout=15,
             )
+            if not transcript.ok:
+                _logger.error('AssemblyAI /transcript status=%s body=%s', transcript.status_code, transcript.text)
             transcript.raise_for_status()
             transcript_id = transcript.json()['id']
 
