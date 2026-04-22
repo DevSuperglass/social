@@ -129,23 +129,49 @@ class MailGatewayWhatsappService(models.AbstractModel):
         return converted_content
 
     def _transcribe_audio(self, audio_bytes: bytes) -> str:
-        """Transcreve áudio MP3 via Groq Whisper API (whisper-large-v3). Retorna string vazia em caso de falha."""
+        """Transcreve áudio MP3 via AssemblyAI (Universal, pt). Retorna string vazia em caso de falha."""
+        import time as _time
         api_key = self.env['ir.config_parameter'].sudo().get_param('mail_gateway_whatsapp.transcription_api_key', '')
         if not api_key:
             return ''
+        headers = {'authorization': api_key}
         try:
-            from io import BytesIO as _BytesIO
-            resp = requests.post(
-                'https://api.groq.com/openai/v1/audio/transcriptions',
-                headers={'Authorization': f'Bearer {api_key}'},
-                files={'file': ('audio.mp3', _BytesIO(audio_bytes), 'audio/mpeg')},
-                data={'model': 'whisper-large-v3', 'language': 'pt', 'response_format': 'text'},
+            upload = requests.post(
+                'https://api.assemblyai.com/v2/upload',
+                headers={**headers, 'content-type': 'application/octet-stream'},
+                data=audio_bytes,
                 timeout=30,
             )
-            resp.raise_for_status()
-            return resp.text.strip()
+            upload.raise_for_status()
+            audio_url = upload.json()['upload_url']
+
+            transcript = requests.post(
+                'https://api.assemblyai.com/v2/transcript',
+                headers=headers,
+                json={'audio_url': audio_url, 'language_code': 'pt'},
+                timeout=15,
+            )
+            transcript.raise_for_status()
+            transcript_id = transcript.json()['id']
+
+            for _ in range(60):
+                _time.sleep(1)
+                poll = requests.get(
+                    f'https://api.assemblyai.com/v2/transcript/{transcript_id}',
+                    headers=headers,
+                    timeout=10,
+                )
+                poll.raise_for_status()
+                data = poll.json()
+                if data['status'] == 'completed':
+                    return (data.get('text') or '').strip()
+                if data['status'] == 'error':
+                    _logger.error('AssemblyAI erro: %s', data.get('error'))
+                    return ''
+            _logger.warning('AssemblyAI timeout ao aguardar transcrição')
+            return ''
         except Exception:
-            _logger.exception('Erro ao transcrever áudio via Groq')
+            _logger.exception('Erro ao transcrever áudio via AssemblyAI')
             return ''
 
     def base64_decode(self, base64_string):

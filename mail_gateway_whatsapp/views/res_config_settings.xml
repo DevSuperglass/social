@@ -15,9 +15,9 @@
                     <div class="row mt16 o_settings_container">
                         <div class="col-12 col-lg-6 o_setting_box">
                             <div class="o_setting_right_pane">
-                                <label for="mail_gateway_whatsapp_transcription_api_key" string="API Key de Transcrição (Groq · whisper-large-v3)"/>
+                                <label for="mail_gateway_whatsapp_transcription_api_key" string="API Key de Transcrição (AssemblyAI · Universal)"/>
                                 <div class="text-muted">
-                                    Chave da API Groq para transcrição de áudios recebidos via WhatsApp (modelo whisper-large-v3).
+                                    Chave da API AssemblyAI para transcrição de áudios recebidos via WhatsApp (modelo Universal, pt).
                                 </div>
                                 <div class="mt8">
                                     <field name="mail_gateway_whatsapp_transcription_api_key" password="True"/>
