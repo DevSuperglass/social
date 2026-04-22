@@ -148,7 +148,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             transcript = requests.post(
                 'https://api.assemblyai.com/v2/transcript',
                 headers=headers,
-                json={'audio_url': audio_url, 'language_code': 'pt'},
+                json={'audio_url': audio_url, 'language_code': 'pt', 'language_detection': False},
                 timeout=15,
             )
             transcript.raise_for_status()
