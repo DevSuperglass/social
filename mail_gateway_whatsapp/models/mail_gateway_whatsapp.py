@@ -129,9 +129,60 @@ class MailGatewayWhatsappService(models.AbstractModel):
         return converted_content
 
     def _transcribe_audio(self, audio_bytes: bytes) -> str:
-        """Transcreve áudio MP3 via AssemblyAI (Universal, pt). Retorna string vazia em caso de falha."""
+        """Transcreve áudio usando o provedor configurado em Configurações → WhatsApp."""
+        get_param = self.env['ir.config_parameter'].sudo().get_param
+        provider = get_param('mail_gateway_whatsapp.transcription_provider', '')
+        if not provider:
+            return ''
+        if provider == 'groq':
+            return self._transcribe_groq(audio_bytes, get_param('mail_gateway_whatsapp.groq_api_key', ''))
+        if provider == 'deepgram':
+            return self._transcribe_deepgram(audio_bytes, get_param('mail_gateway_whatsapp.deepgram_api_key', ''))
+        if provider == 'assemblyai':
+            return self._transcribe_assemblyai(audio_bytes, get_param('mail_gateway_whatsapp.assemblyai_api_key', ''))
+        _logger.warning('Provedor de transcrição desconhecido: %s', provider)
+        return ''
+
+    def _transcribe_groq(self, audio_bytes: bytes, api_key: str) -> str:
+        """Transcrição via Groq (whisper-large-v3)."""
+        if not api_key:
+            return ''
+        try:
+            from io import BytesIO as _BytesIO
+            resp = requests.post(
+                'https://api.groq.com/openai/v1/audio/transcriptions',
+                headers={'Authorization': f'Bearer {api_key}'},
+                files={'file': ('audio.mp3', _BytesIO(audio_bytes), 'audio/mpeg')},
+                data={'model': 'whisper-large-v3', 'language': 'pt', 'response_format': 'text'},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            return resp.text.strip()
+        except Exception:
+            _logger.exception('Erro ao transcrever áudio via Groq')
+            return ''
+
+    def _transcribe_deepgram(self, audio_bytes: bytes, api_key: str) -> str:
+        """Transcrição via Deepgram (nova-2, pt-BR)."""
+        if not api_key:
+            return ''
+        try:
+            resp = requests.post(
+                'https://api.deepgram.com/v1/listen',
+                params={'model': 'nova-2', 'language': 'pt-BR'},
+                headers={'Authorization': f'Token {api_key}', 'Content-Type': 'audio/mpeg'},
+                data=audio_bytes,
+                timeout=30,
+            )
+            resp.raise_for_status()
+            return resp.json()['results']['channels'][0]['alternatives'][0]['transcript'].strip()
+        except Exception:
+            _logger.exception('Erro ao transcrever áudio via Deepgram')
+            return ''
+
+    def _transcribe_assemblyai(self, audio_bytes: bytes, api_key: str) -> str:
+        """Transcrição via AssemblyAI (universal-2, pt)."""
         import time as _time
-        api_key = self.env['ir.config_parameter'].sudo().get_param('mail_gateway_whatsapp.transcription_api_key', '')
         if not api_key:
             return ''
         headers = {'authorization': api_key}
