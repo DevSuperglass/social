@@ -585,3 +585,25 @@ class MailGatewayWhatsappService(models.AbstractModel):
             )
             self._post_process_message(message, channel)
             return message
+        else:
+            update = {
+                'messages': [{'from': mobile}],
+                'contacts': [{'wa_id': mobile, 'profile': {'name': mobile}}]
+            }
+            channel = self._get_channel(gateway_id, mobile, update, force_create=True)
+            if channel:
+                message = channel.with_context({
+                    'no_gateway_notification': True,
+                    'no_auto_pin': not channel.queue_id
+                }).message_post(
+                    body=body_message,
+                    author_id=2 if self.env.context.get('is_internal') else self.env['res.users'].browse(
+                        self.env.uid).partner_id.id,
+                    message_type="comment",
+                    subtype_xmlid="mail.mt_comment",
+                    gateway_type="whatsapp",
+                    date=datetime.today(),
+                )
+                self._post_process_message(message, channel)
+                return message
+            return None
