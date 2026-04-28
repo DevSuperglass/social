@@ -9,8 +9,17 @@
         'mail_gateway_whatsapp',
     ],
     'data': [
+        'security/ir.model.access.csv',
         'data/cron.xml',
         'views/res_config_views.xml',
+        'views/learned_alias.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'mail_gateway_whatsapp_bot/static/src/models/thread.js',
+            'mail_gateway_whatsapp_bot/static/src/models/messaging_notification_handler.js',
+            'mail_gateway_whatsapp_bot/static/src/models/discuss_channel_attendance_filter.js',
+        ],
+    },
     'license': 'LGPL-3',
 }

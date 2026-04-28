@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+learned_alias_admin,learned_alias_admin,model_learned_alias,cotacoes.group_quotation_administrator_user,1,1,1,1
