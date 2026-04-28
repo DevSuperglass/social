@@ -80,42 +80,11 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         if not chat:
                             continue
                         message_id = self._process_update(chat, message, change["value"])
-                        queue_created = False
                         if message_id:
-                            queue_created = self._set_queue(chat, message_id)
+                            self._set_queue(chat, message_id)
                         # self._get_crm_meta(message.get("from"))
                         if message.get("type") == "button":
                             self._process_button(message.get("button", {}).get("payload"), message)
-                        # TODO refatorar para modulo bridge
-                        elif message_id and chat.attendance_type != 'human':
-                            self._apply_whitelist_rule(chat, message_id)
-                        if queue_created and chat.attendance_type == 'human':
-                            self._send_attendance_start(mobile=chat.gateway_channel_token)
-
-    def _apply_whitelist_rule(self, channel, message_id):
-        """
-        Verifica se o gateway do canal possui uma regra de whitelist ativa
-        para o partner remetente e, caso positivo, executa o código associado.
-        """
-        rules = self.env['mail.gateway.whitelist'].search([
-            ('gateway_id', '=', channel.gateway_id.id),
-            ('code', '!=', False),
-        ])
-        if not rules:
-            channel.write({'attendance_type': 'human'})
-            return
-
-        partner = self.env['res.partner.gateway.channel'].search(
-            [('gateway_token', '=', channel.gateway_channel_token)],
-            limit=1,
-        ).partner_id
-
-        for rule in rules:
-            if partner in rule.partner_ids:
-                rule.execute(channel, message_id)
-                return
-
-        channel.write({'attendance_type': 'human'})
 
     @staticmethod
     def convert_audio(content):

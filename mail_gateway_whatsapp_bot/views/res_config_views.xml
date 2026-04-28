@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="res_config_settings_view_form_chatbot_inherit" model="ir.ui.view">
+            <field name="name">res.config.settings.view.form.chatbot.inherit</field>
+            <field name="model">res.config.settings</field>
+            <field name="inherit_id" ref="cotacoes.res_config_settings_view_form_quotation_extension_inherit"/>
+            <field name="arch" type="xml">
+                <xpath expr="//div[@id='cotacao_bi_extension']" position="inside">
+                    <h2 groups="cotacoes.group_quotation_administrator_user">Agente IA</h2>
+                    <div class="row mt16 o_settings_container"
+                         groups="cotacoes.group_quotation_administrator_user">
+                        <div class="col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="ai_agent_url"/>
+                                <div class="text-muted">
+                                    URL do microserviço do agente IA (ex: http://localhost:8080)
+                                </div>
+                                <field name="ai_agent_url" placeholder="http://localhost:8080"/>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="ai_agent_secret"/>
+                                <div class="text-muted">
+                                    Secret compartilhado para autenticação com o agente IA
+                                </div>
+                                <field name="ai_agent_secret" password="True"/>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="bot_idle_timeout_minutes"/>
+                                <div class="text-muted">
+                                    Tempo em minutos sem resposta do cliente para encerrar atendimento bot
+                                </div>
+                                <field name="bot_idle_timeout_minutes"/>
+                            </div>
+                        </div>
+                    </div>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>
