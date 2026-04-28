@@ -4,9 +4,9 @@
         <record id="res_config_settings_view_form_chatbot_inherit" model="ir.ui.view">
             <field name="name">res.config.settings.view.form.chatbot.inherit</field>
             <field name="model">res.config.settings</field>
-            <field name="inherit_id" ref="cotacoes.res_config_settings_view_form_quotation_extension_inherit"/>
+            <field name="inherit_id" ref="mail_gateway_whatsapp.res_config_settings_view_whatsapp"/>
             <field name="arch" type="xml">
-                <xpath expr="//div[@id='cotacao_bi_extension']" position="inside">
+                <xpath expr="//div[@data-key='mail_gateway_whatsapp']" position="inside">
                     <h2 groups="cotacoes.group_quotation_administrator_user">Agente IA</h2>
                     <div class="row mt16 o_settings_container"
                          groups="cotacoes.group_quotation_administrator_user">
