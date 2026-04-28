@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Tree: adiciona attendance_type e bot_escalated -->
+    <record id="view_quotation_queue_tree_bot_inherit" model="ir.ui.view">
+        <field name="name">quotation.queue.tree.bot.inherit</field>
+        <field name="model">quotation.queue</field>
+        <field name="inherit_id" ref="cotacoes.view_quotation_queue_tree"/>
+        <field name="arch" type="xml">
+            <field name="seller_id" position="after">
+                <field name="attendance_type" string="Atendimento" widget="badge"
+                       decoration-info="attendance_type == 'bot'"
+                       decoration-success="attendance_type == 'human'"/>
+                <field name="bot_escalated" string="Escalado" widget="boolean_toggle"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Form: adiciona next_queue_id, botão Próximo Atendimento e campos de bot -->
+    <record id="view_quotation_queue_form_bot_inherit" model="ir.ui.view">
+        <field name="name">quotation.queue.form.bot.inherit</field>
+        <field name="model">quotation.queue</field>
+        <field name="inherit_id" ref="cotacoes.view_quotation_queue_form"/>
+        <field name="arch" type="xml">
+            <field name="quotation_id" position="after">
+                <field name="next_queue_id" invisible="1"/>
+            </field>
+            <button name="button_open_quotation" position="after">
+                <button type="object" name="button_open_next_queue"
+                        class="oe_stat_button" icon="fa-arrow-circle-right"
+                        attrs="{'invisible': [('next_queue_id', '=', False)]}">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_text">Próximo Atendimento</span>
+                    </div>
+                </button>
+            </button>
+            <field name="seller_id" position="after">
+                <field name="attendance_type"/>
+                <field name="bot_escalated" readonly="1"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Search: adiciona filtros de bot -->
+    <record id="view_quotation_queue_search_bot_inherit" model="ir.ui.view">
+        <field name="name">quotation.queue.search.bot.inherit</field>
+        <field name="model">quotation.queue</field>
+        <field name="inherit_id" ref="cotacoes.view_quotation_queue_search"/>
+        <field name="arch" type="xml">
+            <filter name="open_attendances" position="after">
+                <filter name="bot_attendances" string="Atendimento Bot"
+                    domain="[('attendance_type', '=', 'bot')]"/>
+                <filter name="human_attendances" string="Atendimento Humano"
+                    domain="[('attendance_type', '=', 'human')]"/>
+                <filter name="bot_escalated" string="Escalados pelo cliente"
+                    domain="[('bot_escalated', '=', True)]"/>
+            </filter>
+        </field>
+    </record>
+
+</odoo>

@@ -11,8 +11,10 @@
     'data': [
         'security/ir.model.access.csv',
         'data/cron.xml',
+        'data/superglassbot_user.xml',
         'views/res_config_views.xml',
         'views/learned_alias.xml',
+        'views/quotation_queue.xml',
     ],
     'assets': {
         'web.assets_backend': [
