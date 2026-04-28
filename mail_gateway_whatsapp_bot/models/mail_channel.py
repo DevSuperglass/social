@@ -125,6 +125,10 @@ class Channel(models.Model):
                 )
                 channel.delete_password_queue()
 
+    def delete_password_queue(self):
+        self.write({'attendance_type': False})
+        return super().delete_password_queue()
+
     def transfer_to_human(self, reason='', summary=''):
         """
         Transfere o atendimento do bot para um vendedor humano.
