@@ -52,8 +52,6 @@
                 (4, ref('mail.group_mail_template_editor')),
                 (4, ref('mail_gateway.gateway_user')),
                 (4, ref('whatsapp_template.group_whatsapp_template_administrator_user')),
-                (4, ref('configure.group_user_configure')),
-                (4, ref('configure.group_admin_configure')),
                 (4, ref('configure_provider.group_admin_configure_provider')),
                 (4, ref('it_inventory.access_it_inventory_high_level_group')),
                 (4, ref('stock_count.access_stock_count_session_high_level_group')),
