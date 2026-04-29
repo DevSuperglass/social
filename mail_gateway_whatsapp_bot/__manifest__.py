@@ -12,6 +12,7 @@
         'security/ir.model.access.csv',
         'data/cron.xml',
         'data/superglassbot_user.xml',
+        'data/chatbot_whitelist.xml',
         'views/res_config_views.xml',
         'views/learned_alias.xml',
         'views/quotation_queue.xml',
