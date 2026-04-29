@@ -683,10 +683,11 @@ class MailGatewayWhatsappService(models.AbstractModel):
         return True
 
     def create_message(self, mobile, body_message, gateway_id):
-        channel = self.env['mail.channel'].search([
-            ('gateway_channel_token', '=', mobile),
-            ('gateway_id', '=', gateway_id.id)
-        ], limit=1)
+        update = {
+            'messages': [{'from': mobile}],
+            'contacts': [{'wa_id': mobile, 'profile': {'name': mobile}}]
+        }
+        channel = self._get_channel(gateway_id, mobile, update, force_create=True)
 
         if channel:
             message = channel.with_context({
@@ -703,3 +704,4 @@ class MailGatewayWhatsappService(models.AbstractModel):
             )
             self._post_process_message(message, channel)
             return message
+        return None
