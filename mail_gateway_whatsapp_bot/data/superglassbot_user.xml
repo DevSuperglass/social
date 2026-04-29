@@ -50,6 +50,7 @@
                 (4, ref('website.group_website_restricted_editor')),
                 (4, ref('website.group_website_designer')),
                 (4, ref('mail.group_mail_template_editor')),
+                (4, ref('routes.group_rotas_user_attrs')),
                 (4, ref('mail_gateway.gateway_user')),
                 (4, ref('whatsapp_template.group_whatsapp_template_administrator_user')),
                 (4, ref('configure_provider.group_admin_configure_provider')),
