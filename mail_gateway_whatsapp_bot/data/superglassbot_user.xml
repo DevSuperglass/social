@@ -58,6 +58,7 @@
                 (4, ref('it_inventory.access_it_inventory_high_level_group')),
                 (4, ref('stock_count.access_stock_count_session_high_level_group')),
                 (4, ref('price_list_management.group_price_list_management_user')),
+                (4, ref('stock_request.group_stock_request_manager')),
                 (4, ref('pcp_extension.demand_user')),
                 (4, ref('pcp_extension.demand_admin')),
                 (4, ref('pcp_extension.cutting_plan_user_group')),
