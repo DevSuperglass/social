@@ -23,7 +23,7 @@ class Channel(models.Model):
         para não bloquear o fluxo do Odoo. A resposta é enviada de volta via WhatsApp.
         """
         if not self.attendance_type:
-            bot_user = self.env['res.users'].sudo().search([('login', '=', 'superglassbot')], limit=1)
+            bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
             self.write({'attendance_type': 'bot', 'seller_id': bot_user.id if bot_user else False})
             if self.queue_id:
                 self.queue_id.sudo().write({'attendance_type': 'bot', 'seller_id': bot_user.id if bot_user else False})
