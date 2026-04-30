@@ -23,9 +23,10 @@ class Channel(models.Model):
         para não bloquear o fluxo do Odoo. A resposta é enviada de volta via WhatsApp.
         """
         if not self.attendance_type:
-            self.write({'attendance_type': 'bot'})
+            bot_user = self.env['res.users'].sudo().search([('login', '=', 'superglassbot')], limit=1)
+            self.write({'attendance_type': 'bot', 'seller_id': bot_user.id if bot_user else False})
             if self.queue_id:
-                self.queue_id.sudo().write({'attendance_type': 'bot'})
+                self.queue_id.sudo().write({'attendance_type': 'bot', 'seller_id': bot_user.id if bot_user else False})
 
         agent_url = self.env['ir.config_parameter'].sudo().get_param(
             'cotacoes.ai_agent_url', 'http://localhost:8080'
