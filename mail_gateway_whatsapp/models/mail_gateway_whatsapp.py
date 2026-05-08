@@ -303,12 +303,6 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 whatsapp_id=message.get("id")
             )
             self._post_process_message(new_message, chat)
-            if transcription:
-                chat.with_context({'no_gateway_notification': True}).message_post(
-                    body=f'<b>Áudio transcrito:</b><br/><br/>{transcription}',
-                    message_type='notification',
-                    subtype_xmlid='mail.mt_note',
-                )
             return new_message
         else:
             _logger.warning("JSON DA MENSAGEM VAZIA: " + str(message))
