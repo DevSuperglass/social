@@ -4,5 +4,5 @@ from odoo import fields, models, api
 class MailMessage(models.Model):
     _inherit = 'mail.message'
 
-    whatsapp_id = fields.Char()
-    whatsapp_decoded_id = fields.Char()
+    whatsapp_id = fields.Char(index=True)
+    whatsapp_decoded_id = fields.Char(index=True)
