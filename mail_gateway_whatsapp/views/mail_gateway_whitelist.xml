@@ -30,7 +30,12 @@
                     </group>
                     <group string="Configuração">
                         <field name="gateway_id" string="Gateway" options="{'no_create': True}"/>
-                        <field name="partner_ids" widget="many2many_tags" string="Partners" options="{'no_create': True}"/>
+                        <field name="allowed_partner_ids" invisible="1"/>
+                        <field name="partner_ids"
+                               widget="many2many_tags"
+                               string="Partners"
+                               options="{'no_create': True}"
+                               domain="[('id', 'in', allowed_partner_ids)]"/>
                     </group>
                     <notebook>
                         <page string="Código Python">
