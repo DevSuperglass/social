@@ -138,7 +138,7 @@ class Channel(models.Model):
         """
         self.ensure_one()
 
-        self.write({'attendance_type': 'human'})
+        self.write({'attendance_type': 'human', 'seller_id': False})
         if self.queue_id:
             msgs = self._channel_fetch_message()
             last_msg_id = msgs[0].get('id') if msgs else False
