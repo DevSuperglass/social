@@ -232,7 +232,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             self._send_attendance_start(mobile=channel_id.gateway_channel_token)
 
     def _send_attendance_start(self, mobile):
-        self.with_context({'is_internal': True})._send_tmpl_message(
+        self.with_context({'is_internal': True}).send_tmpl_message(
             tmpl_name=None,
             gateway_phone='335789752960181',
             components="Seu atendimento será iniciado em breve",
