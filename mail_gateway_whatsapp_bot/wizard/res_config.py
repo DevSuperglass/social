@@ -36,4 +36,8 @@ class ResConfigSettings(models.TransientModel):
         config = self.env['ir.config_parameter'].sudo()
         config.set_param('cotacoes.ai_agent_url', self.ai_agent_url or 'http://localhost:8080')
         config.set_param('cotacoes.ai_agent_secret', self.ai_agent_secret or '')
-        config.set_param('cotacoes.bot_idle_timeout_minutes', self.bot_idle_timeout_minutes or 5)
+        idle_minutes = self.bot_idle_timeout_minutes or 5
+        config.set_param('cotacoes.bot_idle_timeout_minutes', idle_minutes)
+        cron = self.env.ref('mail_gateway_whatsapp_bot.cron_close_idle_bot_attendances', raise_if_not_found=False)
+        if cron:
+            cron.sudo().write({'interval_number': idle_minutes, 'interval_type': 'minutes'})

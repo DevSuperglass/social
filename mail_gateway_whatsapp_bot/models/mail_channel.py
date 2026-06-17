@@ -101,7 +101,8 @@ class Channel(models.Model):
             'cotacoes.bot_idle_timeout_minutes', '5'
         ))
         cutoff = datetime.datetime.now() - datetime.timedelta(minutes=idle_minutes)
-        odoobot_partner_id = self.env.ref('base.partner_root').id
+        bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
+        odoobot_partner_id = bot_user.partner_id.id if bot_user else self.env.ref('base.partner_root').id
 
         channels = self.search([
             ('attendance_type', '=', 'bot'),
