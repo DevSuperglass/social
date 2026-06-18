@@ -27,6 +27,11 @@ class Channel(models.Model):
             self.write({'attendance_type': 'bot', 'seller_id': bot_user.id if bot_user else False})
             if self.queue_id:
                 self.queue_id.sudo().write({'attendance_type': 'bot', 'seller_id': bot_user.id if bot_user else False})
+            self.message_post(
+                body='<b>Atendimento iniciado pelo Bot</b>',
+                message_type='notification',
+                subtype_xmlid='mail.mt_note',
+            )
 
         agent_url = self.env['ir.config_parameter'].sudo().get_param(
             'cotacoes.ai_agent_url', 'http://localhost:8080'
