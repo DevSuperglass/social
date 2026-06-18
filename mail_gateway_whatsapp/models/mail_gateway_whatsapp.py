@@ -321,12 +321,10 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 ],
                 limit=1
             ).partner_id
-            bot_user = self.env['res.users'].sudo().search([('login', '=', 'superglassbot')], limit=1)
             channel_id.write({
                 'queue_id': self.env['quotation.queue'].sudo().create({
                     'channel_id': channel_id.id,
                     'partner_id': partner_id.id,
-                    'seller_id': bot_user.id if bot_user else False,
                     'initial_date': datetime.now(),
                     'start_message_id': message_id.id,
                     'quotation_id': message_id.gateway_message_id.res_id
