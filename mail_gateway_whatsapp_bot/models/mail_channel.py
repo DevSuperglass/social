@@ -133,7 +133,7 @@ class Channel(models.Model):
         if was_bot:
             bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
             if bot_user:
-                return super(MailChannel, self.with_user(bot_user)).delete_password_queue()
+                return super(Channel, self.with_user(bot_user)).delete_password_queue()
         return super().delete_password_queue()
 
     def transfer_to_human(self, reason='', summary=''):
