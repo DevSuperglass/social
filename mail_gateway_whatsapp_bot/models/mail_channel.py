@@ -131,6 +131,25 @@ class Channel(models.Model):
                     channel.id, last_message.date,
                 )
                 channel.delete_password_queue()
+                self._notify_chatbot_clear_session(channel.id)
+
+    def _notify_chatbot_clear_session(self, channel_id):
+        agent_url = self.env['ir.config_parameter'].sudo().get_param('cotacoes.ai_agent_url', '')
+        agent_secret = self.env['ir.config_parameter'].sudo().get_param('cotacoes.ai_agent_secret', '')
+        if not agent_url:
+            return
+        try:
+            headers = {'Content-Type': 'application/json'}
+            if agent_secret:
+                headers['X-Webhook-Secret'] = agent_secret
+            requests.post(
+                f'{agent_url}/internal/clear-session',
+                json={'channel_id': channel_id},
+                headers=headers,
+                timeout=5,
+            )
+        except Exception as e:
+            _logger.warning('Erro ao notificar chatbot para limpar sessão channel=%s: %s', channel_id, e)
 
     def delete_password_queue(self):
         was_bot = self.attendance_type == 'bot'
