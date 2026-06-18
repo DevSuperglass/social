@@ -128,8 +128,9 @@ class Channel(models.Model):
                 channel.delete_password_queue()
 
     def delete_password_queue(self):
+        was_bot = self.attendance_type == 'bot'
         self.write({'attendance_type': False})
-        return super().delete_password_queue()
+        return super(MailChannel, self.with_context(was_bot_attendance=was_bot)).delete_password_queue()
 
     def transfer_to_human(self, reason='', summary=''):
         """
