@@ -3,7 +3,7 @@
     <data noupdate="1">
         <record id="superglassbot_user" model="res.users">
             <field name="name">SuperglassBot</field>
-            <field name="login">superglassbot</field>
+            <field name="login">superglassbot@odoo.com</field>
             <field name="active" eval="True"/>
             <field name="share" eval="False"/>
             <field name="groups_id" eval="[
