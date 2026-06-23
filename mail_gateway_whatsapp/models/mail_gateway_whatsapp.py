@@ -491,7 +491,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
         partner_id = self.env['res.partner'].search(
             [
                 ('phone_sanitized', '=', "+" + number)
-            ]
+            ],
+            limit=1
         )
         if not partner_id:
             vals_list = {
