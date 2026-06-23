@@ -232,7 +232,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
             self._send_attendance_start(mobile=channel_id.gateway_channel_token)
 
     def _send_attendance_start(self, mobile):
-        self.with_context({'is_internal': True})._send_tmpl_message(
+        self.with_context({'is_internal': True}).send_tmpl_message(
             tmpl_name=None,
             gateway_phone='335789752960181',
             components="Seu atendimento será iniciado em breve",
@@ -491,7 +491,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
         partner_id = self.env['res.partner'].search(
             [
                 ('phone_sanitized', '=', "+" + number)
-            ]
+            ],
+            limit=1
         )
         if not partner_id:
             vals_list = {
@@ -520,7 +521,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
         # By default, it does nothing.
         return {}
 
-    def _send_tmpl_message(self, gateway_phone, tmpl_name, components, mobile_list, body_message):
+    def send_tmpl_message(self, gateway_phone, tmpl_name, components, mobile_list, body_message):
         gateway = self.env['mail.gateway'].search([('whatsapp_from_phone', '=', gateway_phone)], limit=1)
         tmpl_id = self.env['whatsapp.template'].search([('name', '=', tmpl_name)], limit=1)
 
@@ -565,10 +566,11 @@ class MailGatewayWhatsappService(models.AbstractModel):
             })
 
     def create_message(self, mobile, body_message, gateway_id):
-        channel = self.env['mail.channel'].search([
-            ('gateway_channel_token', '=', mobile),
-            ('gateway_id', '=', gateway_id.id)
-        ], limit=1)
+        update = {
+            'messages': [{'from': mobile}],
+            'contacts': [{'wa_id': mobile, 'profile': {'name': mobile}}]
+        }
+        channel = self._get_channel(gateway_id, mobile, update, force_create=True)
 
         if channel:
             message = channel.with_context({
@@ -585,3 +587,4 @@ class MailGatewayWhatsappService(models.AbstractModel):
             )
             self._post_process_message(message, channel)
             return message
+        return None
