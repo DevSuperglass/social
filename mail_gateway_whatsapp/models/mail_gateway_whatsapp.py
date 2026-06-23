@@ -88,12 +88,19 @@ class MailGatewayWhatsappService(models.AbstractModel):
 
     @staticmethod
     def convert_audio(content):
+        _logger.info('[AUDIO] convert_audio entrada: %s bytes', len(content or b''))
         ogg_audio = AudioSegment.from_file(BytesIO(content), format="ogg")
+        _logger.info(
+            '[AUDIO] decodificado: duracao=%sms canais=%s frame_rate=%s dBFS=%s max_dBFS=%s',
+            len(ogg_audio), ogg_audio.channels, ogg_audio.frame_rate,
+            ogg_audio.dBFS, ogg_audio.max_dBFS,
+        )
 
         mp3_io = BytesIO()
         ogg_audio.export(mp3_io, format="mp3")
 
         converted_content = mp3_io.getvalue()
+        _logger.info('[AUDIO] convert_audio saida: %s bytes (mp3)', len(converted_content))
 
         return converted_content
 
@@ -153,7 +160,16 @@ class MailGatewayWhatsappService(models.AbstractModel):
         """Transcrição via AssemblyAI (universal-2, pt)."""
         import time as _time
         if not api_key:
+            _logger.warning('[ASSEMBLYAI] api_key vazia, abortando')
             return ''
+
+        _logger.info(
+            '[ASSEMBLYAI] iniciando: audio_bytes=%d bytes | primeiros8=%s | ultimos8=%s',
+            len(audio_bytes),
+            audio_bytes[:8].hex() if audio_bytes else 'vazio',
+            audio_bytes[-8:].hex() if audio_bytes else 'vazio',
+        )
+
         headers = {'authorization': api_key}
         try:
             upload = requests.post(
@@ -162,21 +178,32 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 data=audio_bytes,
                 timeout=30,
             )
+            _logger.info('[ASSEMBLYAI] upload status=%s body=%s', upload.status_code, upload.text[:300])
             upload.raise_for_status()
             audio_url = upload.json()['upload_url']
+            _logger.info('[ASSEMBLYAI] upload_url=%s', audio_url)
+
+            transcript_payload = {
+                'audio_url': audio_url,
+                'language_code': 'pt',
+                'language_detection': False,
+                'speech_models': ['universal-2'],
+            }
+            _logger.info('[ASSEMBLYAI] payload transcript=%s', transcript_payload)
 
             transcript = requests.post(
                 'https://api.assemblyai.com/v2/transcript',
                 headers=headers,
-                json={'audio_url': audio_url, 'language_code': 'pt', 'language_detection': False, 'speech_models': ['universal-2']},
+                json=transcript_payload,
                 timeout=15,
             )
-            if not transcript.ok:
-                _logger.error('AssemblyAI /transcript status=%s body=%s', transcript.status_code, transcript.text)
+            _logger.info('[ASSEMBLYAI] /transcript status=%s body=%s', transcript.status_code, transcript.text[:500])
             transcript.raise_for_status()
-            transcript_id = transcript.json()['id']
+            transcript_data = transcript.json()
+            transcript_id = transcript_data['id']
+            _logger.info('[ASSEMBLYAI] transcript_id=%s status_inicial=%s', transcript_id, transcript_data.get('status'))
 
-            for _ in range(60):
+            for attempt in range(60):
                 _time.sleep(1)
                 poll = requests.get(
                     f'https://api.assemblyai.com/v2/transcript/{transcript_id}',
@@ -185,15 +212,30 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 )
                 poll.raise_for_status()
                 data = poll.json()
-                if data['status'] == 'completed':
-                    return (data.get('text') or '').strip()
-                if data['status'] == 'error':
-                    _logger.error('AssemblyAI erro: %s', data.get('error'))
+                status = data.get('status')
+                _logger.info('[ASSEMBLYAI] poll #%d status=%s', attempt + 1, status)
+                if status == 'completed':
+                    text_raw = data.get('text')
+                    words = data.get('words') or []
+                    _logger.info(
+                        '[ASSEMBLYAI] completed: duracao=%ss | audio_url=%s | speech_model=%s | '
+                        'language=%s | confidence=%s | words=%d | text_raw=%r',
+                        data.get('audio_duration'),
+                        data.get('audio_url'),
+                        data.get('speech_model'),
+                        data.get('language_code'),
+                        data.get('confidence'),
+                        len(words),
+                        text_raw,
+                    )
+                    return (text_raw or '').strip()
+                if status == 'error':
+                    _logger.error('[ASSEMBLYAI] erro na transcrição: %s | full=%s', data.get('error'), data)
                     return ''
-            _logger.warning('AssemblyAI timeout ao aguardar transcrição')
+            _logger.warning('[ASSEMBLYAI] timeout após 60 tentativas')
             return ''
         except Exception:
-            _logger.exception('Erro ao transcrever áudio via AssemblyAI')
+            _logger.exception('[ASSEMBLYAI] exceção na transcrição')
             return ''
 
     def base64_decode(self, base64_string):
@@ -260,9 +302,26 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 converted_audio = None
 
                 if key == 'audio':
+                    raw_audio = attachment_request.content
+                    _logger.info(
+                        '[AUDIO] cru WhatsApp: %s bytes content-type=%s',
+                        len(raw_audio or b''),
+                        attachment_request.headers.get('Content-Type'),
+                    )
+                    try:
+                        with open('/tmp/wa_raw.ogg', 'wb') as _f:
+                            _f.write(raw_audio)
+                    except Exception as _e:
+                        _logger.warning('[AUDIO] falha ao salvar wa_raw.ogg: %s', _e)
                     attachment_json['mime_type'] = 'audio/mpeg'
-                    converted_audio = self.convert_audio(content=attachment_request.content)
+                    converted_audio = self.convert_audio(content=raw_audio)
+                    try:
+                        with open('/tmp/wa_conv.mp3', 'wb') as _f:
+                            _f.write(converted_audio)
+                    except Exception as _e:
+                        _logger.warning('[AUDIO] falha ao salvar wa_conv.mp3: %s', _e)
                     transcription = self._transcribe_audio(converted_audio)
+                    _logger.info('[AUDIO] transcricao resultante: %r', transcription)
                     if transcription:
                         body = transcription
 
