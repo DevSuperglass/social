@@ -16,6 +16,7 @@
         'views/res_config_views.xml',
         'views/learned_alias.xml',
         'views/quotation_queue.xml',
+        'views/product_pricelist_views.xml',
     ],
     'assets': {
         'web.assets_backend': [

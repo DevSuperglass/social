@@ -22,8 +22,17 @@ class Channel(models.Model):
         Envia a mensagem do cliente para o agente IA em uma thread separada
         para não bloquear o fluxo do Odoo. A resposta é enviada de volta via WhatsApp.
         """
+        bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
+        bot_partner_id = bot_user.partner_id.id if bot_user else False
+        root_partner_id = self.env.ref('base.partner_root').id
+
+        # Ignora mensagens enviadas pelo próprio bot, OdooBot ou notas/notificações internas
+        if message.author_id and message.author_id.id in (bot_partner_id, root_partner_id):
+            return
+        if message.message_type == 'notification':
+            return
+
         if not self.attendance_type:
-            bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
             self.write({'attendance_type': 'bot', 'seller_id': bot_user.id if bot_user else False})
             if self.queue_id:
                 self.queue_id.sudo().write({'attendance_type': 'bot', 'seller_id': bot_user.id if bot_user else False})
@@ -34,7 +43,7 @@ class Channel(models.Model):
             )
 
         agent_url = self.env['ir.config_parameter'].sudo().get_param(
-            'cotacoes.ai_agent_url', 'http://localhost:8080'
+            'cotacoes.ai_agent_url', 'http://localhost:8000'
         )
         agent_secret = self.env['ir.config_parameter'].sudo().get_param(
             'cotacoes.ai_agent_secret', ''
