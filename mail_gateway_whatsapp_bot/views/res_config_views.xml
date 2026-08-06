@@ -14,9 +14,9 @@
                             <div class="o_setting_right_pane">
                                 <label for="ai_agent_url"/>
                                 <div class="text-muted">
-                                    URL do microserviço do agente IA (ex: http://localhost:8000)
+                                    URL do microserviço do agente IA (ex: http://localhost:8080)
                                 </div>
-                                <field name="ai_agent_url" placeholder="http://localhost:8000"/>
+                                <field name="ai_agent_url" placeholder="http://localhost:8080"/>
                             </div>
                         </div>
                         <div class="col-lg-6 o_setting_box">
