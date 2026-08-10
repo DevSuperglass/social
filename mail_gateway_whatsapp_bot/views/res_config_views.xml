@@ -37,6 +37,15 @@
                                 <field name="bot_idle_timeout_minutes"/>
                             </div>
                         </div>
+                        <div class="col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="human_escalation_attempts"/>
+                                <div class="text-muted">
+                                    Número de tentativas sem resolução antes de oferecer atendimento humano ao cliente
+                                </div>
+                                <field name="human_escalation_attempts"/>
+                            </div>
+                        </div>
                     </div>
                 </xpath>
             </field>
