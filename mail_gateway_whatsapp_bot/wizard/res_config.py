@@ -24,7 +24,7 @@ class ResConfigSettings(models.TransientModel):
         res = super().get_values()
         config = self.env['ir.config_parameter'].sudo()
         res.update({
-            'ai_agent_url': config.get_param('cotacoes.ai_agent_url', 'http://localhost:8080'),
+            'ai_agent_url': config.get_param('cotacoes.ai_agent_url', 'http://localhost:8000'),
             'ai_agent_secret': config.get_param('cotacoes.ai_agent_secret', ''),
             'bot_idle_timeout_minutes': int(config.get_param('cotacoes.bot_idle_timeout_minutes', '5')),
         })
@@ -34,7 +34,7 @@ class ResConfigSettings(models.TransientModel):
     def set_values(self):
         super().set_values()
         config = self.env['ir.config_parameter'].sudo()
-        config.set_param('cotacoes.ai_agent_url', self.ai_agent_url or 'http://localhost:8080')
+        config.set_param('cotacoes.ai_agent_url', self.ai_agent_url or 'http://localhost:8000')
         config.set_param('cotacoes.ai_agent_secret', self.ai_agent_secret or '')
         idle_minutes = self.bot_idle_timeout_minutes or 5
         config.set_param('cotacoes.bot_idle_timeout_minutes', idle_minutes)

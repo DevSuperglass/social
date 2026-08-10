@@ -34,7 +34,7 @@ class Channel(models.Model):
             )
 
         agent_url = self.env['ir.config_parameter'].sudo().get_param(
-            'cotacoes.ai_agent_url', 'http://localhost:8080'
+            'cotacoes.ai_agent_url', 'http://localhost:8000'
         )
         agent_secret = self.env['ir.config_parameter'].sudo().get_param(
             'cotacoes.ai_agent_secret', ''
