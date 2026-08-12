@@ -20,18 +20,19 @@ class MailGatewayWhatsapp(models.AbstractModel):
                         queue_created = False
                         if message_id:
                             queue_created = self._set_queue(chat, message_id)
-                        if message.get("type") == "button":
+                        is_button = message.get("type") == "button"
+                        if is_button:
                             self._process_button(message.get("button", {}).get("payload"), message)
-                        elif message_id:
-                            self._on_message_received_bot(chat, message_id, queue_created)
+                        if message_id:
+                            self._on_message_received_bot(chat, message_id, queue_created, is_button=is_button)
 
-    def _on_message_received_bot(self, chat, message_id, queue_created):
+    def _on_message_received_bot(self, chat, message_id, queue_created, is_button=False):
         if chat.attendance_type != 'human':
-            self._apply_whitelist_rule(chat, message_id)
+            self._apply_whitelist_rule(chat, message_id, is_button=is_button)
         if queue_created and chat.attendance_type == 'human':
             self._send_attendance_start(mobile=chat.gateway_channel_token)
 
-    def _apply_whitelist_rule(self, channel, message_id):
+    def _apply_whitelist_rule(self, channel, message_id, is_button=False):
         rules = self.env['mail.gateway.whitelist'].search([
             ('gateway_id', '=', channel.gateway_id.id),
             ('code', '!=', False),
@@ -47,7 +48,7 @@ class MailGatewayWhatsapp(models.AbstractModel):
 
         for rule in rules:
             if partner in rule.partner_ids:
-                rule.execute(channel, message_id)
+                rule.execute(channel.with_context(is_button=is_button), message_id)
                 return
 
         channel.write({'attendance_type': 'human'})

@@ -33,6 +33,11 @@ class Channel(models.Model):
                 subtype_xmlid='mail.mt_note',
             )
 
+        if self.env.context.get('is_button'):
+            # Clique em botão (CONFIRMAR/DESISTIR/PEÇA ERRADA) já é tratado por
+            # item_verification_response — não deve ser interpretado pelo agente IA.
+            return
+
         agent_url = self.env['ir.config_parameter'].sudo().get_param(
             'cotacoes.ai_agent_url', 'http://localhost:8000'
         )
