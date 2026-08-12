@@ -99,15 +99,13 @@ class Channel(models.Model):
     def _cron_close_idle_bot_attendances(self):
         """
         Encerra atendimentos bot que estão ociosos há mais de N minutos.
-        Considera ocioso quando a última mensagem foi enviada pelo OdooBot
-        e o cliente não respondeu dentro do prazo.
+        Considera ocioso quando a última mensagem do canal (de qualquer autor)
+        foi enviada há mais tempo que o prazo configurado.
         """
         idle_minutes = int(self.env['ir.config_parameter'].sudo().get_param(
             'cotacoes.bot_idle_timeout_minutes', '5'
         ))
         cutoff = datetime.datetime.now() - datetime.timedelta(minutes=idle_minutes)
-        bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
-        odoobot_partner_id = bot_user.partner_id.id if bot_user else self.env.ref('base.partner_root').id
 
         channels = self.search([
             ('attendance_type', '=', 'bot'),
@@ -125,7 +123,7 @@ class Channel(models.Model):
                 order='date desc',
                 limit=1,
             )
-            if last_message and last_message.author_id.id == odoobot_partner_id and last_message.date <= cutoff:
+            if last_message and last_message.date <= cutoff:
                 _logger.info(
                     'Encerrando atendimento bot ocioso: channel=%s, última msg=%s',
                     channel.id, last_message.date,
