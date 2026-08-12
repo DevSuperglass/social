@@ -38,7 +38,7 @@ class MailGatewayWhatsapp(models.AbstractModel):
             ('code', '!=', False),
         ])
         if not rules:
-            channel.write({'attendance_type': 'human'})
+            self._set_human_attendance(channel)
             return
 
         partner = self.env['res.partner.gateway.channel'].search(
@@ -51,4 +51,10 @@ class MailGatewayWhatsapp(models.AbstractModel):
                 rule.execute(channel.with_context(is_button=is_button), message_id)
                 return
 
+        self._set_human_attendance(channel)
+
+    def _set_human_attendance(self, channel):
+        """Marca canal (e a queue vinculada, se houver) como atendimento humano."""
         channel.write({'attendance_type': 'human'})
+        if channel.queue_id:
+            channel.queue_id.sudo().write({'attendance_type': 'human'})
