@@ -83,20 +83,160 @@ class MailGatewayWhatsappService(models.AbstractModel):
                         if message_id:
                             self._set_queue(chat, message_id)
                         # self._get_crm_meta(message.get("from"))
-                        if message.get("type") != "button":
-                            continue
-                        self._process_button(message.get("button", {}).get("payload"), message)
+                        if message.get("type") == "button":
+                            self._process_button(message.get("button", {}).get("payload"), message)
 
     @staticmethod
     def convert_audio(content):
+        _logger.info('[AUDIO] convert_audio entrada: %s bytes', len(content or b''))
         ogg_audio = AudioSegment.from_file(BytesIO(content), format="ogg")
+        _logger.info(
+            '[AUDIO] decodificado: duracao=%sms canais=%s frame_rate=%s dBFS=%s max_dBFS=%s',
+            len(ogg_audio), ogg_audio.channels, ogg_audio.frame_rate,
+            ogg_audio.dBFS, ogg_audio.max_dBFS,
+        )
 
         mp3_io = BytesIO()
         ogg_audio.export(mp3_io, format="mp3")
 
         converted_content = mp3_io.getvalue()
+        _logger.info('[AUDIO] convert_audio saida: %s bytes (mp3)', len(converted_content))
 
         return converted_content
+
+    def _transcribe_audio(self, audio_bytes: bytes) -> str:
+        """Transcreve áudio usando o provedor configurado em Configurações → WhatsApp."""
+        get_param = self.env['ir.config_parameter'].sudo().get_param
+        provider = get_param('mail_gateway_whatsapp.transcription_provider', '')
+        if not provider:
+            return ''
+        if provider == 'groq':
+            return self._transcribe_groq(audio_bytes, get_param('mail_gateway_whatsapp.groq_api_key', ''))
+        if provider == 'deepgram':
+            return self._transcribe_deepgram(audio_bytes, get_param('mail_gateway_whatsapp.deepgram_api_key', ''))
+        if provider == 'assemblyai':
+            return self._transcribe_assemblyai(audio_bytes, get_param('mail_gateway_whatsapp.assemblyai_api_key', ''))
+        _logger.warning('Provedor de transcrição desconhecido: %s', provider)
+        return ''
+
+    def _transcribe_groq(self, audio_bytes: bytes, api_key: str) -> str:
+        """Transcrição via Groq (whisper-large-v3)."""
+        if not api_key:
+            return ''
+        try:
+            from io import BytesIO as _BytesIO
+            resp = requests.post(
+                'https://api.groq.com/openai/v1/audio/transcriptions',
+                headers={'Authorization': f'Bearer {api_key}'},
+                files={'file': ('audio.mp3', _BytesIO(audio_bytes), 'audio/mpeg')},
+                data={'model': 'whisper-large-v3', 'language': 'pt', 'response_format': 'text'},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            return resp.text.strip()
+        except Exception:
+            _logger.exception('Erro ao transcrever áudio via Groq')
+            return ''
+
+    def _transcribe_deepgram(self, audio_bytes: bytes, api_key: str) -> str:
+        """Transcrição via Deepgram (nova-2, pt-BR)."""
+        if not api_key:
+            return ''
+        try:
+            resp = requests.post(
+                'https://api.deepgram.com/v1/listen',
+                params={'model': 'nova-2', 'language': 'pt-BR'},
+                headers={'Authorization': f'Token {api_key}', 'Content-Type': 'audio/mpeg'},
+                data=audio_bytes,
+                timeout=30,
+            )
+            resp.raise_for_status()
+            return resp.json()['results']['channels'][0]['alternatives'][0]['transcript'].strip()
+        except Exception:
+            _logger.exception('Erro ao transcrever áudio via Deepgram')
+            return ''
+
+    def _transcribe_assemblyai(self, audio_bytes: bytes, api_key: str) -> str:
+        """Transcrição via AssemblyAI (universal-2, pt)."""
+        import time as _time
+        if not api_key:
+            _logger.warning('[ASSEMBLYAI] api_key vazia, abortando')
+            return ''
+
+        _logger.info(
+            '[ASSEMBLYAI] iniciando: audio_bytes=%d bytes | primeiros8=%s | ultimos8=%s',
+            len(audio_bytes),
+            audio_bytes[:8].hex() if audio_bytes else 'vazio',
+            audio_bytes[-8:].hex() if audio_bytes else 'vazio',
+        )
+
+        headers = {'authorization': api_key}
+        try:
+            upload = requests.post(
+                'https://api.assemblyai.com/v2/upload',
+                headers={**headers, 'content-type': 'application/octet-stream'},
+                data=audio_bytes,
+                timeout=30,
+            )
+            _logger.info('[ASSEMBLYAI] upload status=%s body=%s', upload.status_code, upload.text[:300])
+            upload.raise_for_status()
+            audio_url = upload.json()['upload_url']
+            _logger.info('[ASSEMBLYAI] upload_url=%s', audio_url)
+
+            transcript_payload = {
+                'audio_url': audio_url,
+                'language_code': 'pt',
+                'language_detection': False,
+                'speech_models': ['universal-2'],
+            }
+            _logger.info('[ASSEMBLYAI] payload transcript=%s', transcript_payload)
+
+            transcript = requests.post(
+                'https://api.assemblyai.com/v2/transcript',
+                headers=headers,
+                json=transcript_payload,
+                timeout=15,
+            )
+            _logger.info('[ASSEMBLYAI] /transcript status=%s body=%s', transcript.status_code, transcript.text[:500])
+            transcript.raise_for_status()
+            transcript_data = transcript.json()
+            transcript_id = transcript_data['id']
+            _logger.info('[ASSEMBLYAI] transcript_id=%s status_inicial=%s', transcript_id, transcript_data.get('status'))
+
+            for attempt in range(60):
+                _time.sleep(1)
+                poll = requests.get(
+                    f'https://api.assemblyai.com/v2/transcript/{transcript_id}',
+                    headers=headers,
+                    timeout=10,
+                )
+                poll.raise_for_status()
+                data = poll.json()
+                status = data.get('status')
+                _logger.info('[ASSEMBLYAI] poll #%d status=%s', attempt + 1, status)
+                if status == 'completed':
+                    text_raw = data.get('text')
+                    words = data.get('words') or []
+                    _logger.info(
+                        '[ASSEMBLYAI] completed: duracao=%ss | audio_url=%s | speech_model=%s | '
+                        'language=%s | confidence=%s | words=%d | text_raw=%r',
+                        data.get('audio_duration'),
+                        data.get('audio_url'),
+                        data.get('speech_model'),
+                        data.get('language_code'),
+                        data.get('confidence'),
+                        len(words),
+                        text_raw,
+                    )
+                    return (text_raw or '').strip()
+                if status == 'error':
+                    _logger.error('[ASSEMBLYAI] erro na transcrição: %s | full=%s', data.get('error'), data)
+                    return ''
+            _logger.warning('[ASSEMBLYAI] timeout após 60 tentativas')
+            return ''
+        except Exception:
+            _logger.exception('[ASSEMBLYAI] exceção na transcrição')
+            return ''
 
     def base64_decode(self, base64_string):
         pattern = re.compile(b'^\x1c\x18(?:\x0c|\r)(\d+)\x15\x02\x00(.)\x18(.)([A-Z0-9]+)\x00$')
@@ -118,6 +258,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
         chat.ensure_one()
         body = ""
         attachments = []
+        transcription = ''
         if message.get("text"):
             body = message.get("text").get("body")
         if message.get("payload_text"):
@@ -161,8 +302,28 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 converted_audio = None
 
                 if key == 'audio':
+                    raw_audio = attachment_request.content
+                    _logger.info(
+                        '[AUDIO] cru WhatsApp: %s bytes content-type=%s',
+                        len(raw_audio or b''),
+                        attachment_request.headers.get('Content-Type'),
+                    )
+                    try:
+                        with open('/tmp/wa_raw.ogg', 'wb') as _f:
+                            _f.write(raw_audio)
+                    except Exception as _e:
+                        _logger.warning('[AUDIO] falha ao salvar wa_raw.ogg: %s', _e)
                     attachment_json['mime_type'] = 'audio/mpeg'
-                    converted_audio = self.convert_audio(content=attachment_request.content)
+                    converted_audio = self.convert_audio(content=raw_audio)
+                    try:
+                        with open('/tmp/wa_conv.mp3', 'wb') as _f:
+                            _f.write(converted_audio)
+                    except Exception as _e:
+                        _logger.warning('[AUDIO] falha ao salvar wa_conv.mp3: %s', _e)
+                    transcription = self._transcribe_audio(converted_audio)
+                    _logger.info('[AUDIO] transcricao resultante: %r', transcription)
+                    if transcription:
+                        body = transcription
 
                 attachments.append(
                     (
@@ -209,6 +370,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
     def _set_queue(self, channel_id, message_id):
         """
             Criação de atendimento.
+            Retorna True se uma nova fila foi criada, False caso contrário.
         """
 
         if not channel_id.queue_id and channel_id.gateway_id.whatsapp_from_phone == '335789752960181':
@@ -229,7 +391,8 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 }).id,
                 'queue_priority': int(partner_id.priority_rating)
             })
-            self._send_attendance_start(mobile=channel_id.gateway_channel_token)
+            return True
+        return False
 
     def _send_attendance_start(self, mobile):
         self.with_context({'is_internal': True}).send_tmpl_message(
@@ -564,6 +727,7 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'json': json,
                 'mail_message_id': message.id,
             })
+        return True
 
     def create_message(self, mobile, body_message, gateway_id):
         update = {

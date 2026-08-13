@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="superglassbot_user" model="res.users">
+            <field name="name">SuperglassBot</field>
+            <field name="login">superglassbot@odoo.com</field>
+            <field name="active" eval="True"/>
+            <field name="share" eval="False"/>
+            <field name="groups_id" eval="[
+                (4, ref('base.group_user')),
+                (4, ref('base.group_partner_manager')),
+                (4, ref('sales_team.group_sale_salesman')),
+                (4, ref('sales_team.group_sale_salesman_all_leads')),
+                (4, ref('sales_team.group_sale_manager')),
+                (4, ref('sale.group_warning_sale')),
+                (4, ref('crm.group_use_lead')),
+                (4, ref('cotacoes.group_quotation_sales_user')),
+                (4, ref('cotacoes.group_quotation_administrator_user')),
+                (4, ref('cotacoes.group_ti')),
+                (4, ref('stock.group_stock_user')),
+                (4, ref('stock.group_stock_manager')),
+                (4, ref('stock.group_adv_location')),
+                (4, ref('stock.group_production_lot')),
+                (4, ref('stock.group_stock_multi_locations')),
+                (4, ref('stock.group_stock_multi_warehouses')),
+                (4, ref('mrp.group_mrp_user')),
+                (4, ref('mrp.group_mrp_manager')),
+                (4, ref('mrp.group_mrp_routings')),
+                (4, ref('mrp.group_mrp_workorder_dependencies')),
+                (4, ref('purchase.group_purchase_user')),
+                (4, ref('purchase.group_purchase_manager')),
+                (4, ref('purchase.group_send_reminder')),
+                (4, ref('product.group_product_pricelist')),
+                (4, ref('product.group_product_variant')),
+                (4, ref('product.group_sale_pricelist')),
+                (4, ref('product_company.group_product_user_hitec')),
+                (4, ref('product_company.group_product_admin_hitec')),
+                (4, ref('hr.group_hr_user')),
+                (4, ref('hr.group_hr_manager')),
+                (4, ref('hr_attendance.group_hr_attendance_kiosk')),
+                (4, ref('project.group_project_user')),
+                (4, ref('project.group_project_manager')),
+                (4, ref('project.group_project_stages')),
+                (4, ref('project.group_project_task_dependencies')),
+                (4, ref('project.group_subtask_project')),
+                (4, ref('project_requests.group_chamados_attrs')),
+                (4, ref('project_requests.group_agendamentos_admin')),
+                (4, ref('fleet.fleet_group_user')),
+                (4, ref('fleet.fleet_group_manager')),
+                (4, ref('website.group_website_restricted_editor')),
+                (4, ref('website.group_website_designer')),
+                (4, ref('mail.group_mail_template_editor')),
+                (4, ref('routes.group_rotas_user_attrs')),
+                (4, ref('mail_gateway.gateway_user')),
+                (4, ref('whatsapp_template.group_whatsapp_template_administrator_user')),
+                (4, ref('configure_provider.group_admin_configure_provider')),
+                (4, ref('it_inventory.access_it_inventory_high_level_group')),
+                (4, ref('stock_count.access_stock_count_session_high_level_group')),
+                (4, ref('price_list_management.group_price_list_management_user')),
+                (4, ref('stock_request.group_stock_request_manager')),
+                (4, ref('pcp_extension.demand_user')),
+                (4, ref('pcp_extension.demand_admin')),
+                (4, ref('pcp_extension.cutting_plan_user_group')),
+                (4, ref('cqd.group_user_administrator_cqd')),
+                (4, ref('fipe.group_fipe_admin')),
+            ]"/>
+        </record>
+    </data>
+</odoo>

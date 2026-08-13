@@ -52,8 +52,8 @@
     </record>
     <record model="ir.ui.menu" id="res_partner_gateway_channel_menu">
         <field name="name">Gateway Partner Channels</field>
-        <field name="parent_id" ref="base.menu_email" />
+        <field name="parent_id" ref="mail_gateway.mail_gateway_menu" />
         <field name="action" ref="res_partner_gateway_channel_act_window" />
-        <field name="sequence" eval="16" />
+        <field name="sequence" eval="2" />
     </record>
 </odoo>

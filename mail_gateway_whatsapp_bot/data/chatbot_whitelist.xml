@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="chatbot_whitelist" model="mail.gateway.whitelist">
+            <field name="name">ChatBot</field>
+            <field name="gateway_id" model="mail.gateway" search="[('name', '=', 'COTAÇÃO')]"/>
+            <field name="code">mail_channel._dispatch_to_ai_agent()</field>
+        </record>
+    </data>
+</odoo>

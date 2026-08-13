@@ -59,6 +59,12 @@ class GatewayController(Controller):
         messages = value.get('messages', [])
         statuses = value.get('statuses', [])
 
+        if value['contacts'][0].get('wa_id') not in ('5511989877288', '5511996238246', '5511939493986', '5511972332347', '5511960663088', '5511950376130', '5511942294528', '5511935055010'):
+            _logger.info('número diferente')
+            return
+        else:
+            _logger.info('número ' + value['contacts'][0].get('wa_id'))
+
         if not messages and statuses:
             _logger.debug("Received a status update, not processing further.")
             return

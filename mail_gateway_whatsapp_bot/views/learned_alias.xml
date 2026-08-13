@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Tree View -->
+    <record id="learned_alias_tree_view" model="ir.ui.view">
+        <field name="name">learned.alias.tree</field>
+        <field name="model">learned.alias</field>
+        <field name="arch" type="xml">
+            <tree string="Aliases Aprendidos pela IA"
+                  create="false"
+                  delete="false"
+                  editable="bottom">
+                <field name="create_date" string="Data" widget="badge" readonly="1"/>
+                <field name="source" string="Origem" widget="badge" readonly="1"
+                       decoration-info="source == 'llm'"
+                       decoration-warning="source == 'fuzzy'"/>
+                <field name="attribute_label" string="Tipo IA" widget="badge" readonly="1"/>
+                <field name="term" string="Valor Recebido" readonly="1"/>
+                <field name="correction" string="Correção IA" readonly="1"/>
+                <field name="new_attribute" string="Readequar Tipo" optional="show"/>
+                <field name="new_correction" string="Readequar Correção" optional="show"/>
+                <field name="original_message" string="Mensagem do Cliente" decoration-bf="1" readonly="1"/>
+                <field name="tipo" invisible="1"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Server Actions (aparecem no menu Ação ao selecionar registros) -->
+    <record id="action_accept_selected" model="ir.actions.server">
+        <field name="name">Aceitar</field>
+        <field name="model_id" ref="model_learned_alias"/>
+        <field name="binding_model_id" ref="model_learned_alias"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">records.action_accept()</field>
+    </record>
+
+    <record id="action_reject_selected" model="ir.actions.server">
+        <field name="name">Rejeitar</field>
+        <field name="model_id" ref="model_learned_alias"/>
+        <field name="binding_model_id" ref="model_learned_alias"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">records.action_reject()</field>
+    </record>
+
+    <!-- Action -->
+    <record id="learned_alias_action" model="ir.actions.act_window">
+        <field name="name">Aprendizado da IA</field>
+        <field name="res_model">learned.alias</field>
+        <field name="view_mode">tree</field>
+        <field name="view_id" ref="learned_alias_tree_view"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Nenhum alias pendente de revisão.
+            </p>
+            <p>
+                Use a ação <strong>Sincronizar com JSON</strong> para importar
+                os aliases aprendidos pela IA.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu item -->
+    <menuitem id="menu_learned_alias"
+              name="Chatbot"
+              parent="mail_gateway.mail_gateway_menu"
+              action="learned_alias_action"
+              sequence="5"/>
+
+</odoo>
