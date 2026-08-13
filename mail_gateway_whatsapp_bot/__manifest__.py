@@ -22,6 +22,7 @@
             'mail_gateway_whatsapp_bot/static/src/models/thread.js',
             'mail_gateway_whatsapp_bot/static/src/models/messaging_notification_handler.js',
             'mail_gateway_whatsapp_bot/static/src/models/discuss_channel_attendance_filter.js',
+            'mail_gateway_whatsapp_bot/static/src/components/thread_view_topbar/thread_view_topbar.xml',
         ],
     },
     'license': 'LGPL-3',

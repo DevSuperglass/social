@@ -5,7 +5,7 @@ import { attr } from "@mail/model/model_field";
 
 registerPatch({
     name: "Thread",
-    recordMethods: {
+    modelMethods: {
         convertData(data) {
             const data2 = this._super(data);
             if ('attendance_type' in data) {
