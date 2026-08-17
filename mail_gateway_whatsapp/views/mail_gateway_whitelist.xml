@@ -33,12 +33,12 @@
                         <field name="allowed_partner_ids" invisible="1"/>
                         <field name="partner_ids"
                                widget="many2many_tags"
-                               string="Partners"
+                               string="Contatos"
                                options="{'no_create': True}"
                                domain="[('id', 'in', allowed_partner_ids)]"/>
                     </group>
                     <notebook>
-                        <page string="Código Python">
+                        <page name="code_page" string="Código Python">
                             <field name="code" widget="ace" options="{'mode': 'python'}"/>
                         </page>
                     </notebook>

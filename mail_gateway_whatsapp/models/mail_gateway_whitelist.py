@@ -15,7 +15,6 @@ class MailGatewayWhitelist(models.Model):
     partner_ids = fields.Many2many(
         'res.partner',
         string='Contatos',
-        required=True,
     )
     allowed_partner_ids = fields.Many2many(
         'res.partner',
