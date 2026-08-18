@@ -100,21 +100,32 @@ class Channel(models.Model):
                 c['attendance_type'] = channel_record.attendance_type or False
         return channel_infos
 
+    _BOT_IDLE_WARNING_RATIO = 0.7
+    _BOT_IDLE_WARNING_MARKER = 'será encerrado automaticamente após'
+
     @api.model
     def _cron_close_idle_bot_attendances(self):
         """
         Encerra atendimentos bot que estão ociosos há mais de N minutos.
-        Considera ocioso quando a última mensagem do canal (de qualquer autor)
-        foi enviada há mais tempo que o prazo configurado.
+        Considera ocioso quando a última mensagem do BOT no canal foi enviada
+        há mais tempo que o prazo configurado.
 
-        Exceção: canais com quotation.line em status 'waiting' (aguardando
-        confirmação de estoque pela logística) nunca são considerados ociosos
-        por essa checagem — a resposta pendente é da logística, não do cliente.
+        Aos 70% do prazo (ex.: 7 min de um limite de 10), envia um aviso ao
+        cliente de que o atendimento será encerrado por inatividade — uma
+        única vez por mensagem, sem repetir a cada execução do cron enquanto
+        não houver nova mensagem do bot.
+
+        Exceção: se a última mensagem do bot for a de verificação com a
+        logística (produto sem estoque, aguardando confirmação do time de
+        estoque), o prazo de ociosidade não é respeitado — quem precisa
+        responder é a logística, não o cliente.
         """
         idle_minutes = int(self.env['ir.config_parameter'].sudo().get_param(
             'cotacoes.bot_idle_timeout_minutes', '5'
         ))
-        cutoff = datetime.datetime.now() - datetime.timedelta(minutes=idle_minutes)
+        now = datetime.datetime.now()
+        cutoff = now - datetime.timedelta(minutes=idle_minutes)
+        warning_cutoff = now - datetime.timedelta(minutes=idle_minutes * self._BOT_IDLE_WARNING_RATIO)
 
         channels = self.search([
             ('attendance_type', '=', 'bot'),
@@ -122,31 +133,55 @@ class Channel(models.Model):
             ('channel_type', '=', 'gateway'),
         ])
 
-        for channel in channels:
-            waiting_lines = channel.queue_id.quotation_id.quotation_line_ids.filtered(
-                lambda l: l.status == 'waiting'
-            )
-            if waiting_lines:
-                # Aguardando confirmação da logística (estoque), não do cliente —
-                # não conta como ociosidade do atendimento.
-                continue
+        bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
+        bot_partner_id = bot_user.partner_id.id if bot_user else False
 
+        for channel in channels:
             last_message = self.env['mail.message'].search(
                 [
                     ('res_id', '=', channel.id),
                     ('model', '=', 'mail.channel'),
                     ('message_type', '=', 'comment'),
+                    ('author_id', '=', bot_partner_id),
                 ],
                 order='date desc',
                 limit=1,
             )
-            if last_message and last_message.date <= cutoff:
+            if not last_message:
+                continue
+            if 'verificando a disponibilidade imediata com nossa logística' in (last_message.body or ''):
+                continue
+
+            if last_message.date <= cutoff:
                 _logger.info(
                     'Encerrando atendimento bot ocioso: channel=%s, última msg=%s',
                     channel.id, last_message.date,
                 )
                 channel.delete_password_queue()
                 self._notify_chatbot_clear_session(channel.id)
+            elif last_message.date <= warning_cutoff:
+                already_warned = self.env['mail.message'].search_count([
+                    ('res_id', '=', channel.id),
+                    ('model', '=', 'mail.channel'),
+                    ('date', '>', last_message.date),
+                    ('body', 'like', self._BOT_IDLE_WARNING_MARKER),
+                ])
+                if not already_warned:
+                    channel._send_bot_idle_warning(idle_minutes)
+
+    def _send_bot_idle_warning(self, idle_minutes):
+        self.ensure_one()
+        warning_message = (
+            f"Notamos que você está inativo(a) há algum tempo. Caso não haja retorno, "
+            f"este atendimento {self._BOT_IDLE_WARNING_MARKER} {idle_minutes} minutos de inatividade."
+        )
+        self.env['mail.gateway.whatsapp'].send_tmpl_message(
+            tmpl_name=None,
+            gateway_phone='335789752960181',
+            components=warning_message,
+            mobile_list=[self.gateway_channel_token],
+            body_message=warning_message,
+        )
 
     def _notify_chatbot_clear_session(self, channel_id):
         agent_url = self.env['ir.config_parameter'].sudo().get_param('cotacoes.ai_agent_url', '')
