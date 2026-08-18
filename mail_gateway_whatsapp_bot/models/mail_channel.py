@@ -22,6 +22,20 @@ class Channel(models.Model):
         Envia a mensagem do cliente para o agente IA em uma thread separada
         para não bloquear o fluxo do Odoo. A resposta é enviada de volta via WhatsApp.
         """
+        if self.env.context.get('is_button'):
+            # CONFIRMAR/DESISTIR já são tratados inteiramente em
+            # item_verification_response (fecha a fila e limpa a sessão do bot) —
+            # essa checagem precisa vir ANTES do bloco abaixo: como esse método
+            # também roda pra esses botões (mesmo ciclo em que a fila acabou de
+            # ser fechada), sem isso o "if not self.attendance_type" reabriria o
+            # atendimento e postaria "Atendimento iniciado pelo Bot" de novo.
+            # Só PEÇA ERRADA segue pro agente, que dispara o fluxo de alterar termos.
+            # message.body vem com tags HTML (ex.: "<span>PEÇA ERRADA</span>"),
+            # por isso precisa remover antes de comparar.
+            button_text = re.sub(r'<[^>]+>', '', message.body or '').strip().upper()
+            if button_text != 'PEÇA ERRADA':
+                return
+
         if not self.attendance_type:
             bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
             self.write({'attendance_type': 'bot', 'seller_id': bot_user.id if bot_user else False})
@@ -32,11 +46,6 @@ class Channel(models.Model):
                 message_type='notification',
                 subtype_xmlid='mail.mt_note',
             )
-
-        if self.env.context.get('is_button'):
-            # Clique em botão (CONFIRMAR/DESISTIR/PEÇA ERRADA) já é tratado por
-            # item_verification_response — não deve ser interpretado pelo agente IA.
-            return
 
         agent_url = self.env['ir.config_parameter'].sudo().get_param(
             'cotacoes.ai_agent_url', 'http://localhost:8000'
@@ -54,6 +63,7 @@ class Channel(models.Model):
             'message': body_text,
             'partner_id': partner.id if partner else None,
             'author_name': partner.name if partner else None,
+            'is_button': bool(self.env.context.get('is_button')),
         }
 
         channel_id = self.id
