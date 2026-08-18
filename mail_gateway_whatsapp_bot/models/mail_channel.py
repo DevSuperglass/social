@@ -106,6 +106,10 @@ class Channel(models.Model):
         Encerra atendimentos bot que estão ociosos há mais de N minutos.
         Considera ocioso quando a última mensagem do canal (de qualquer autor)
         foi enviada há mais tempo que o prazo configurado.
+
+        Exceção: canais com quotation.line em status 'waiting' (aguardando
+        confirmação de estoque pela logística) nunca são considerados ociosos
+        por essa checagem — a resposta pendente é da logística, não do cliente.
         """
         idle_minutes = int(self.env['ir.config_parameter'].sudo().get_param(
             'cotacoes.bot_idle_timeout_minutes', '5'
@@ -119,6 +123,14 @@ class Channel(models.Model):
         ])
 
         for channel in channels:
+            waiting_lines = channel.queue_id.quotation_id.quotation_line_ids.filtered(
+                lambda l: l.status == 'waiting'
+            )
+            if waiting_lines:
+                # Aguardando confirmação da logística (estoque), não do cliente —
+                # não conta como ociosidade do atendimento.
+                continue
+
             last_message = self.env['mail.message'].search(
                 [
                     ('res_id', '=', channel.id),
