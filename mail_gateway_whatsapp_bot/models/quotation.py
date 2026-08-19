@@ -7,7 +7,7 @@ from odoo.exceptions import UserError
 _logger = logging.getLogger(__name__)
 
 _BOT_LOAD_GATEWAY_PHONE = '378316715373016'  # Gateway de INCLUSÃO
-_BOT_LOAD_NOTIFY_MOBILE = '5511972345900'  # Ricardo Ito
+_BOT_LOAD_NOTIFY_MOBILE = '5511939493986'  # Ricardo Ito
 
 
 class Quotation(models.Model):
@@ -70,8 +70,8 @@ class Quotation(models.Model):
 
     def _build_bot_load_message(self):
         """Monta o texto de pré-carregamento com os itens confirmados —
-        mesmos campos do relatório 'Carregamento' (Produto, Ref. Fornecedor,
-        Quantidade), sem valores."""
+        campos do relatório 'Carregamento' (Produto, Ref. Fornecedor,
+        Quantidade) mais Fabricante, Valor Unitário e Valor Total."""
         self.ensure_one()
         lines = self.quotation_line_ids.filtered(lambda l: l.status == 'confirmed')
 
@@ -81,11 +81,17 @@ class Quotation(models.Model):
             qty = line.quantity_corrected if line.quantity_corrected > 0 else line.quantity
             qty_clean = int(qty) if qty == int(qty) else qty
             ref = line.product_id.hitec_code.provider_ref or '-'
+            fabricante = line.provider_name or '-'
+            valor_unitario = line.revised_product_price
+            valor_total = valor_unitario * qty
             items.append(
                 f"{separator}\n"
                 f"*{i}.* {line.product_id.name}\n"
+                f"Fabricante: {fabricante}\n"
                 f"Ref: {ref}\n"
-                f"Quantidade: *{qty_clean}*"
+                f"Quantidade: *{qty_clean}*\n"
+                f"Valor Unitário: R$ {valor_unitario:.2f}\n"
+                f"Valor Total: R$ {valor_total:.2f}"
             )
         items.append(separator)
 
