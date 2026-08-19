@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- 16h (horário de Brasília, UTC-3) = 19h UTC -->
+        <record id="cron_confirm_bot_quotations" model="ir.cron">
+            <field name="name">Confirmar cotações do bot</field>
+            <field name="model_id" ref="cotacoes.model_quotation"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_confirm_bot_quotations()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="doall" eval="False"/>
+            <field name="nextcall" eval="datetime.utcnow().replace(hour=19, minute=0, second=0, microsecond=0)"/>
+        </record>
+
+        <!-- 16h15 (horário de Brasília) = 19h15 UTC — depois do cron de confirmação -->
+        <record id="cron_notify_bot_quotations_loaded" model="ir.cron">
+            <field name="name">Avisar carregamento das cotações do bot</field>
+            <field name="model_id" ref="cotacoes.model_quotation"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_notify_bot_quotations_loaded()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="doall" eval="False"/>
+            <field name="nextcall" eval="datetime.utcnow().replace(hour=19, minute=15, second=0, microsecond=0)"/>
+        </record>
+    </data>
+</odoo>
