@@ -7,7 +7,7 @@ from odoo.exceptions import UserError
 _logger = logging.getLogger(__name__)
 
 _BOT_LOAD_GATEWAY_PHONE = '378316715373016'  # Gateway de INCLUSÃO
-_BOT_LOAD_NOTIFY_MOBILE = '5511939493986'  # Ricardo Ito
+_BOT_LOAD_NOTIFY_MOBILE = '5511972345900'
 
 
 class Quotation(models.Model):
