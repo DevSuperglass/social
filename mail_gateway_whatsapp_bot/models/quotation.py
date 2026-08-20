@@ -19,7 +19,12 @@ class Quotation(models.Model):
         com pelo menos um item confirmado e nenhum pendente — mesmo processo
         de confirm_quotation() usado manualmente, incluindo a criação de
         gerproc pro financeiro quando o valor excede o limite de crédito
-        aprovado do cliente."""
+        aprovado do cliente.
+
+        Antes de confirmar, preenche payment_mode_id/payment_term_id a partir
+        do cadastro do cliente (payment_term_partner): a única forma de
+        pagamento cadastrada, e a condição de pagamento com o maior "Valor
+        mínimo" que ainda seja menor ou igual ao total da cotação."""
         bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
         if not bot_user:
             return
@@ -34,10 +39,38 @@ class Quotation(models.Model):
                 continue
             if lines.filtered(lambda l: l.status == 'pending'):
                 continue
+
+            quotation._set_payment_mode_and_term_from_partner()
+
             try:
                 quotation.confirm_quotation()
             except UserError as e:
                 _logger.warning('Cron confirmação bot: cotação %s não confirmada: %s', quotation.id, e)
+
+    def _set_payment_mode_and_term_from_partner(self):
+        """Preenche payment_mode_id/payment_term_id com base no cadastro do
+        cliente (object.payment.mode/object.payment.condition), sem
+        sobrescrever o que já estiver preenchido."""
+        self.ensure_one()
+        partner = self.partner_id
+        vals = {}
+
+        if not self.payment_mode_id:
+            payment_mode = partner.new_property_payment_mode_id.mapped(
+                'rel_new_property_payment_mode_id'
+            )[:1]
+            if payment_mode:
+                vals['payment_mode_id'] = payment_mode.id
+
+        if not self.payment_term_id:
+            payment_condition = partner.new_property_payment_term_id.filtered(
+                lambda c: c.min_value <= self.total
+            ).sorted(lambda c: c.min_value, reverse=True)[:1]
+            if payment_condition.rel_new_property_payment_term_id:
+                vals['payment_term_id'] = payment_condition.rel_new_property_payment_term_id.id
+
+        if vals:
+            self.write(vals)
 
     @api.model
     def _cron_notify_bot_quotations_loaded(self):
@@ -67,6 +100,39 @@ class Quotation(models.Model):
                 mobile_list=[_BOT_LOAD_NOTIFY_MOBILE],
                 body_message=message,
             )
+
+    @api.model
+    def _cron_send_bot_quotations_to_hitec(self):
+        """Cria o pedido de venda (botão 'Criar Pedido') pras cotações do bot
+        já confirmadas e ainda sem sale_order_id — mesmo processo manual de
+        create_sale_order(), que confirma o sale.order e já dispara toda a
+        cadeia existente até o Hitec (fatura → hitec_account_move._post() →
+        _send_to_hitec() → database.request). Depende de payment_mode_id/
+        payment_term_id já preenchidos (feito em _cron_confirm_bot_quotations).
+
+        Roda como o próprio SuperglassBot (with_user): create_sale_order()
+        usa self.env.uid como vendedor do pedido, e _send_to_hitec() exige um
+        hr.employee com código Hitec vinculado a esse usuário — rodando como
+        base.user_root (padrão do cron) isso sempre falhava."""
+        bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
+        if not bot_user:
+            return
+
+        quotations = self.search([
+            ('vendor', '=', bot_user.id),
+            ('state', 'in', ('confirmed', 'approved_limit')),
+            ('sale_order_id', '=', False),
+        ])
+        for quotation in quotations:
+            lines = quotation.quotation_line_ids
+            if not lines.filtered(lambda l: l.status == 'confirmed'):
+                continue
+            if lines.filtered(lambda l: l.status == 'pending'):
+                continue
+            try:
+                quotation.with_user(bot_user).create_sale_order()
+            except UserError as e:
+                _logger.warning('Cron envio Hitec bot: cotação %s não convertida em pedido: %s', quotation.id, e)
 
     def _build_bot_load_message(self):
         """Monta o texto de pré-carregamento com os itens confirmados —
