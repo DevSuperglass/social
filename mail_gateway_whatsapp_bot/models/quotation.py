@@ -278,7 +278,18 @@ class Quotation(models.Model):
             channel._notify_chatbot_clear_session(channel.id)
 
             if button == 'CONFIRMAR' and quotation_id._is_past_hitec_cutoff():
+                # message aqui é o template original (usado só pro regex acima),
+                # não o clique em si — author_id dele é o próprio SuperglassBot.
+                # Sobrescreve tudo que _dispatch_to_ai_agent tiraria de message
+                # (message/is_button/partner_id/author_name) com os valores
+                # certos: o botão clicado e o cliente real (recipient_id da
+                # linha, não partner_id da cotação, que é a empresa).
+                client_partner = quotation_id.quotation_line_ids[:1].recipient_id or quotation_id.partner_id
                 channel._dispatch_to_ai_agent(message, extra_payload={
+                    'message': 'CONFIRMAR',
+                    'is_button': True,
+                    'partner_id': client_partner.id if client_partner else None,
+                    'author_name': client_partner.name if client_partner else None,
                     'next_delivery_date': quotation_id.date.isoformat() if quotation_id.date else None,
                     'route_name': quotation_id.partner_route_id.nome_rota or None,
                 })
