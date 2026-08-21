@@ -1,6 +1,7 @@
 from . import mail_channel
 from . import quotation_queue
 from . import quotation
+from . import routes
 from . import mail_gateway_whatsapp
 from . import mail_gateway_whitelist
 from . import mail_gateway_whitelist_contact

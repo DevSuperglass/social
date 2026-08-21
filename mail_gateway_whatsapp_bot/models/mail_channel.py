@@ -17,12 +17,19 @@ class Channel(models.Model):
         index=True
     )
 
-    def _dispatch_to_ai_agent(self, message):
+    def _dispatch_to_ai_agent(self, message, extra_payload=None):
         """
         Envia a mensagem do cliente para o agente IA em uma thread separada
         para não bloquear o fluxo do Odoo. A resposta é enviada de volta via WhatsApp.
+
+        extra_payload: usado só pelo caso de CONFIRMAR tardio (depois do
+        horário de corte do cron de envio ao Hitec) — item_verification_response
+        já fechou a fila do bot e chama esse método diretamente, fora do fluxo
+        normal de mensagem, pra avisar o cliente que o pedido vai pra próxima
+        entrega. Sua presença também sinaliza que a fila foi fechada de
+        propósito e não deve ser reaberta abaixo.
         """
-        if self.env.context.get('is_button'):
+        if self.env.context.get('is_button') and not extra_payload:
             # CONFIRMAR/DESISTIR já são tratados inteiramente em
             # item_verification_response (fecha a fila e limpa a sessão do bot) —
             # essa checagem precisa vir ANTES do bloco abaixo: como esse método
@@ -36,7 +43,7 @@ class Channel(models.Model):
             if button_text != 'PEÇA ERRADA':
                 return
 
-        if not self.attendance_type:
+        if not extra_payload and not self.attendance_type:
             bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
             self.write({'attendance_type': 'bot', 'seller_id': bot_user.id if bot_user else False})
             if self.queue_id:
@@ -65,6 +72,8 @@ class Channel(models.Model):
             'author_name': partner.name if partner else None,
             'is_button': bool(self.env.context.get('is_button')),
         }
+        if extra_payload:
+            payload.update(extra_payload)
 
         channel_id = self.id
 

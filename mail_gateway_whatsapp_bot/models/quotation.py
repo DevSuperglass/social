@@ -1,3 +1,4 @@
+import datetime
 import logging
 import re
 
@@ -12,6 +13,61 @@ _BOT_LOAD_NOTIFY_MOBILE = '5511972345900'
 
 class Quotation(models.Model):
     _inherit = 'quotation'
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Cria normalmente (date/due_date calculados pelo date_deadline()
+        padrão do cotacoes) e, só pras cotações do bot criadas depois do
+        horário de corte do cron de envio ao Hitec, dá um write simulando
+        que a criação foi amanhã — só pra achar o próximo dia de rota certo,
+        evitando que a cotação vença antes do ciclo de amanhã processá-la."""
+        records = super().create(vals_list)
+
+        bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
+        if not bot_user:
+            return records
+
+        for rec in records:
+            if rec.vendor.id != bot_user.id or not rec.partner_route_id:
+                continue
+            if not rec._is_past_hitec_cutoff():
+                continue
+            next_day_route = rec.partner_route_id._compute_next_route_day_from(
+                datetime.date.today() + datetime.timedelta(days=1)
+            )
+            rec.write({
+                'date': next_day_route,
+                'due_date': rec._compute_due_date_for(next_day_route),
+            })
+
+        return records
+
+    def _is_past_hitec_cutoff(self):
+        """Horário de corte lido dinamicamente do cron de envio ao Hitec —
+        nextcall mantém sempre a mesma hora/minuto (UTC), avançando 1 dia a
+        cada execução, então reflete o horário configurado no cron mesmo que
+        ele mude no futuro."""
+        cron = self.env.ref('mail_gateway_whatsapp_bot.cron_send_bot_quotations_to_hitec', raise_if_not_found=False)
+        if not cron or not cron.nextcall:
+            return False
+        return datetime.datetime.utcnow().time() > cron.nextcall.time()
+
+    def _compute_due_date_for(self, next_day_route):
+        """Mesma lógica de get_due_date() em cotacoes/quotation.py:
+        date_deadline(), reimplementada aqui pra não alterar o módulo base
+        (verticalização) — ajusta next_day_route pro dia útil/fds anterior
+        conforme os horários da rota."""
+        self.ensure_one()
+        route = self.partner_route_id
+        due_datetime = datetime.datetime.combine(next_day_route, datetime.time(0, 0))
+        weekday = due_datetime.weekday()
+        if weekday == 6:
+            due_datetime += datetime.timedelta(days=-1, hours=route.weekend_day_time)
+        elif weekday == 0:
+            due_datetime += datetime.timedelta(days=-2, hours=route.weekend_day_time)
+        else:
+            due_datetime += datetime.timedelta(days=-1, hours=route.business_day_time)
+        return due_datetime
 
     @api.model
     def _cron_confirm_bot_quotations(self):
@@ -204,5 +260,11 @@ class Quotation(models.Model):
         if channel.exists() and channel.attendance_type == 'bot':
             channel.delete_password_queue()
             channel._notify_chatbot_clear_session(channel.id)
+
+            if button == 'CONFIRMAR' and quotation_id._is_past_hitec_cutoff():
+                channel._dispatch_to_ai_agent(message, extra_payload={
+                    'next_delivery_date': quotation_id.date.isoformat() if quotation_id.date else None,
+                    'route_name': quotation_id.partner_route_id.nome_rota or None,
+                })
 
         return result
