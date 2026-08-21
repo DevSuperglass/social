@@ -267,6 +267,9 @@ class Quotation(models.Model):
         if not quotation_match:
             return result
 
+        product_match = re.search(r'Produto: (.+?)(?=\n|<)', message.body or '')
+        product_name = product_match.group(1) if product_match else ''
+
         quotation_id = self.browse(int(quotation_match.group(1)))
         if quotation_id.state in ('fully_approved', 'expired', 'review'):
             # Mesmo gate do método base: não houve alteração de status real.
@@ -292,6 +295,7 @@ class Quotation(models.Model):
                     'author_name': client_partner.name if client_partner else None,
                     'next_delivery_date': quotation_id.date.isoformat() if quotation_id.date else None,
                     'route_name': quotation_id.partner_route_id.nome_rota or None,
+                    'product_name': product_name or None,
                 })
 
         return result
