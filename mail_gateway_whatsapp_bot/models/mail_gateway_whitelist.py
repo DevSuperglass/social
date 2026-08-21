@@ -12,8 +12,17 @@ class MailGatewayWhitelist(models.Model):
 
     def write(self, vals):
         old_lines_by_record = {}
+        old_covered_partners_by_record = {}
         if 'contact_line_ids' in vals:
             old_lines_by_record = {record.id: record.contact_line_ids for record in self}
+            # Precisa ser resolvido em partners (não guardar as linhas em si)
+            # ANTES do write: se a remoção do o2m deletar as linhas (comum,
+            # já que whitelist_id é required), acessar parent_id/children_ids
+            # nelas depois do write dispararia MissingError.
+            old_covered_partners_by_record = {
+                record.id: record.contact_line_ids.parent_id | record.contact_line_ids.children_ids
+                for record in self
+            }
 
         old_partners_by_record = {record.id: record.partner_ids for record in self}
 
@@ -26,6 +35,12 @@ class MailGatewayWhitelist(models.Model):
             new_lines = record.contact_line_ids - old_lines_by_record.get(record.id, record.contact_line_ids)
             if new_lines:
                 record._sync_partner_ids_from_lines(new_lines)
+
+            if 'contact_line_ids' in vals:
+                still_covered = record.contact_line_ids.parent_id | record.contact_line_ids.children_ids
+                removed_partners = old_covered_partners_by_record.get(record.id, still_covered) - still_covered
+                if removed_partners:
+                    record._unsync_partner_ids(removed_partners)
 
             new_partners = record.partner_ids - old_partners_by_record.get(record.id, record.partner_ids)
             if new_partners:
@@ -60,6 +75,19 @@ class MailGatewayWhitelist(models.Model):
             return
         super(MailGatewayWhitelist, self).write({'partner_ids': [(4, partner.id) for partner in partners]})
         lines.children_ids._update_bot_whitelist_color()
+
+    def _unsync_partner_ids(self, partners):
+        """
+        Remove de partner_ids os partners que não são mais cobertos por
+        nenhuma linha restante em contact_line_ids (pai removido ou filho que
+        saiu de child_ids) — espelha _sync_partner_ids_from_lines, mas pra
+        remoção. Usa o write da classe pai diretamente para não reentrar no
+        nosso próprio write().
+        """
+        self.ensure_one()
+        if not partners:
+            return
+        super(MailGatewayWhitelist, self).write({'partner_ids': [(3, partner.id) for partner in partners]})
 
     def _normalize_channels_for_bot(self, partners):
         """
