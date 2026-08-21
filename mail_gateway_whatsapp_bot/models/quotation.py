@@ -2,8 +2,12 @@ import datetime
 import logging
 import re
 
+import pytz
+
 from odoo import api, models
 from odoo.exceptions import UserError
+
+_BUSINESS_TZ = pytz.timezone('America/Sao_Paulo')
 
 _logger = logging.getLogger(__name__)
 
@@ -59,7 +63,14 @@ class Quotation(models.Model):
         """Mesma lógica de get_due_date() em cotacoes/quotation.py:
         date_deadline(), reimplementada aqui pra não alterar o módulo base
         (verticalização) — ajusta next_day_route pro dia útil/fds anterior
-        conforme os horários da rota."""
+        conforme os horários da rota.
+
+        Diferente do original: due_datetime é montado em horário local
+        (America/Sao_Paulo, mesma convenção de business_day_time/
+        weekend_day_time) e só então convertido pra UTC antes de virar o
+        valor do campo Datetime — evitar isso fazia o Odoo tratar a meia-noite
+        local como se já fosse meia-noite UTC, adiantando o due_date em 3h e
+        exibindo o dia errado (um dia antes) pro usuário."""
         self.ensure_one()
         route = self.partner_route_id
         due_datetime = datetime.datetime.combine(next_day_route, datetime.time(0, 0))
@@ -70,7 +81,9 @@ class Quotation(models.Model):
             due_datetime += datetime.timedelta(days=-2, hours=route.weekend_day_time)
         else:
             due_datetime += datetime.timedelta(days=-1, hours=route.business_day_time)
-        return due_datetime
+
+        localized = _BUSINESS_TZ.localize(due_datetime)
+        return localized.astimezone(pytz.utc).replace(tzinfo=None)
 
     @api.model
     def _cron_confirm_bot_quotations(self):
