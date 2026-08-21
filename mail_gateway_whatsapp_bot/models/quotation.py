@@ -48,7 +48,10 @@ class Quotation(models.Model):
         cada execução, então reflete o horário configurado no cron mesmo que
         ele mude no futuro."""
         cron = self.env.ref('mail_gateway_whatsapp_bot.cron_send_bot_quotations_to_hitec', raise_if_not_found=False)
-        if not cron or not cron.nextcall:
+        if not cron:
+            return False
+        cron = cron.sudo()
+        if not cron.nextcall:
             return False
         return datetime.datetime.utcnow().time() > cron.nextcall.time()
 
