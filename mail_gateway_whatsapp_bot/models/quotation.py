@@ -47,17 +47,116 @@ class Quotation(models.Model):
         return records
 
     def _is_past_hitec_cutoff(self):
-        """Horário de corte lido dinamicamente do cron de envio ao Hitec —
-        nextcall mantém sempre a mesma hora/minuto (UTC), avançando 1 dia a
-        cada execução, então reflete o horário configurado no cron mesmo que
-        ele mude no futuro."""
-        cron = self.env.ref('mail_gateway_whatsapp_bot.cron_send_bot_quotations_to_hitec', raise_if_not_found=False)
+        """Horário de corte de HOJE pro cron de envio ao Hitec, considerando
+        dia útil (segunda a sexta) x sábado — configurável em Configurações >
+        Cotações > Horários (cotacoes.cron_hour_send_hitec_weekday/_saturday).
+        Não lê mais cron.nextcall: como sábado pode ter horário diferente do
+        dia útil, nextcall passou a variar por dia da semana (reflete a
+        PRÓXIMA execução, não necessariamente o horário de HOJE) — calcular
+        direto da config evita essa inconsistência.
+        Sem cron aos domingos: trata domingo como sempre "passado do corte",
+        caindo no próximo dia útil de rota."""
+        today = datetime.datetime.now(pytz.utc).astimezone(_BUSINESS_TZ).date()
+        if today.weekday() == 6:
+            return True
+        hour_brasilia = self._get_bot_cron_hour(
+            'cron_hour_send_hitec', 16.5, 16.5, today.weekday()
+        )
+        cutoff_time = self._brasilia_hour_to_utc_time(hour_brasilia)
+        return datetime.datetime.utcnow().time() > cutoff_time
+
+    def _get_bot_cron_hour(self, config_prefix, default_weekday, default_saturday, weekday):
+        """Horário (Brasília) configurado pra um cron do bot no dia de semana
+        informado (`weekday`: 0=segunda ... 5=sábado, 6=domingo) — dia útil x
+        sábado têm chaves de config separadas."""
+        config = self.env['ir.config_parameter'].sudo()
+        suffix = 'saturday' if weekday == 5 else 'weekday'
+        default = default_saturday if weekday == 5 else default_weekday
+        return float(config.get_param(f'cotacoes.{config_prefix}_{suffix}', default))
+
+    @staticmethod
+    def _brasilia_hour_to_utc_time(hour_brasilia):
+        """Converte hora (Brasília, float — ex: 16.25 = 16h15) pra datetime.time
+        UTC. Offset fixo -3h: Brasil não observa horário de verão desde 2019."""
+        hour_utc = (hour_brasilia + 3) % 24
+        hh = int(hour_utc)
+        mm = int(round((hour_utc - hh) * 60))
+        return datetime.time(hh, mm)
+
+    def _bot_cron_call_for_day(self, target_day, config_prefix, default_weekday, default_saturday):
+        """Data/hora (UTC) pro cron do bot no dia informado — pula domingo
+        (empurra pra segunda-feira, no horário de dia útil). Base
+        compartilhada por _next_bot_cron_call (reagendamento imediato ao
+        salvar a config) e por _cron_schedule_bot_daily_hours (ajuste diário
+        dos 3 crons pro dia corrente)."""
+        while target_day.weekday() == 6:
+            target_day += datetime.timedelta(days=1)
+        hour_brasilia = self._get_bot_cron_hour(
+            config_prefix, default_weekday, default_saturday, target_day.weekday()
+        )
+        return datetime.datetime.combine(target_day, self._brasilia_hour_to_utc_time(hour_brasilia))
+
+    def _next_bot_cron_call(self, config_prefix, default_weekday, default_saturday):
+        """Próxima data/hora (UTC, a partir de amanhã) de execução de um cron
+        do bot — usado só pelo reagendamento imediato ao salvar a config
+        (res_config.py). O ajuste diário de rotina é feito por
+        _cron_schedule_bot_daily_hours, não por autorreagendamento no fim de
+        cada cron (ver motivo no docstring dele).
+
+        "Hoje"/"amanhã" calculados explicitamente em America/Sao_Paulo (via
+        pytz), não datetime.date.today() — este último usa o fuso do SO do
+        servidor, que pode não ser Brasília (ex: servidor configurado em UTC),
+        levando a classificar o dia de semana errado perto da virada."""
+        today_brasilia = datetime.datetime.now(pytz.utc).astimezone(_BUSINESS_TZ).date()
+        return self._bot_cron_call_for_day(
+            today_brasilia + datetime.timedelta(days=1),
+            config_prefix, default_weekday, default_saturday,
+        )
+
+    def _reschedule_bot_cron(self, xmlid, config_prefix, default_weekday, default_saturday):
+        """Reagenda o nextcall de um cron do bot pra próxima ocorrência —
+        chamado imediatamente quando o horário é alterado em Configurações >
+        Cotações > Horários (contexto seguro: roda fora da execução do
+        próprio cron, sem conflito de lock — ver _cron_schedule_bot_daily_hours)."""
+        cron = self.env.ref(xmlid, raise_if_not_found=False)
         if not cron:
-            return False
-        cron = cron.sudo()
-        if not cron.nextcall:
-            return False
-        return datetime.datetime.utcnow().time() > cron.nextcall.time()
+            return
+        cron.sudo().write({
+            'nextcall': self._next_bot_cron_call(config_prefix, default_weekday, default_saturday)
+        })
+
+    @api.model
+    def _cron_schedule_bot_daily_hours(self):
+        """Roda 1x por dia, num horário FIXO e não-configurável (bem cedo —
+        ver data/quotation_crons.xml), e ajusta o nextcall dos 3 crons
+        configuráveis do bot (confirmação, aviso de carregamento, envio ao
+        Hitec) pro horário de HOJE (dia útil x sábado, config em
+        Configurações > Cotações > Horários).
+
+        Não são os próprios 3 crons que se reagendam sozinhos ao final da
+        execução: ir.cron.write() sempre chama _try_lock() (SELECT ... FOR NO
+        KEY UPDATE NOWAIT) antes de gravar, pra impedir alteração de um cron
+        enquanto ele está em execução — e um cron tentando escrever nele mesmo
+        durante a própria execução colide com esse lock (LockNotAvailable) e
+        derruba o job inteiro, caindo no reagendamento padrão do Odoo (errado,
+        não considera dia útil x sábado). Rodando num horário fixo e bem
+        anterior ao de qualquer um dos 3, este cron nunca concorre com eles
+        (nenhum está em execução nesse momento), então o write() normal
+        funciona sem conflito."""
+        today_brasilia = datetime.datetime.now(pytz.utc).astimezone(_BUSINESS_TZ).date()
+        for xmlid, config_prefix, default_weekday, default_saturday in (
+            ('mail_gateway_whatsapp_bot.cron_confirm_bot_quotations', 'cron_hour_confirm', 16.0, 16.0),
+            ('mail_gateway_whatsapp_bot.cron_notify_bot_quotations_loaded', 'cron_hour_notify_loaded', 16.25, 16.25),
+            ('mail_gateway_whatsapp_bot.cron_send_bot_quotations_to_hitec', 'cron_hour_send_hitec', 16.5, 16.5),
+        ):
+            cron = self.env.ref(xmlid, raise_if_not_found=False)
+            if not cron:
+                continue
+            cron.sudo().write({
+                'nextcall': self._bot_cron_call_for_day(
+                    today_brasilia, config_prefix, default_weekday, default_saturday
+                )
+            })
 
     def _compute_due_date_for(self, next_day_route):
         """Mesma lógica de get_due_date() em cotacoes/quotation.py:

@@ -1,6 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
+        <!-- 00h05 (horário de Brasília, UTC-3) = 03h05 UTC — bem antes de
+             qualquer um dos 3 crons abaixo, pra nunca concorrer com eles.
+             Horário FIXO, não configurável: só ajusta o nextcall dos 3
+             pro horário de HOJE (dia útil x sábado), sem se autorreagendar
+             (ver docstring de _cron_schedule_bot_daily_hours). -->
+        <record id="cron_schedule_bot_daily_hours" model="ir.cron">
+            <field name="name">Ajustar horários diários dos crons do bot (dia útil/sábado)</field>
+            <field name="model_id" ref="cotacoes.model_quotation"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_schedule_bot_daily_hours()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="doall" eval="False"/>
+            <field name="nextcall" eval="datetime.utcnow().replace(hour=3, minute=5, second=0, microsecond=0)"/>
+        </record>
+
         <!-- 16h (horário de Brasília, UTC-3) = 19h UTC -->
         <record id="cron_confirm_bot_quotations" model="ir.cron">
             <field name="name">Confirmar cotações do bot</field>

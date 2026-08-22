@@ -50,5 +50,73 @@
                 </xpath>
             </field>
         </record>
+
+        <record id="res_config_settings_view_form_quotation_hours_inherit" model="ir.ui.view">
+            <field name="name">res.config.settings.view.form.quotation.hours.inherit</field>
+            <field name="model">res.config.settings</field>
+            <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//div[@id='cotacao_bi_extension']" position="inside">
+                    <h2 groups="cotacoes.group_quotation_administrator_user">Horários das Rotinas Automáticas</h2>
+                    <div class="row mt16 o_settings_container"
+                         groups="cotacoes.group_quotation_administrator_user">
+                        <div class="col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="cron_hour_confirm_weekday"/>
+                                <div class="text-muted">
+                                    Horário (Brasília, Seg-Sex) em que cotações do bot com itens confirmados são confirmadas automaticamente
+                                </div>
+                                <field name="cron_hour_confirm_weekday" widget="float_time"/>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="cron_hour_confirm_saturday"/>
+                                <div class="text-muted">
+                                    Horário (Brasília, Sábado) da mesma confirmação automática
+                                </div>
+                                <field name="cron_hour_confirm_saturday" widget="float_time"/>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="cron_hour_notify_loaded_weekday"/>
+                                <div class="text-muted">
+                                    Horário (Brasília, Seg-Sex) de envio do resumo de pré-carregamento das cotações confirmadas
+                                </div>
+                                <field name="cron_hour_notify_loaded_weekday" widget="float_time"/>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="cron_hour_notify_loaded_saturday"/>
+                                <div class="text-muted">
+                                    Horário (Brasília, Sábado) do mesmo aviso de pré-carregamento
+                                </div>
+                                <field name="cron_hour_notify_loaded_saturday" widget="float_time"/>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="cron_hour_send_hitec_weekday"/>
+                                <div class="text-muted">
+                                    Horário (Brasília, Seg-Sex) de criação do pedido de venda e envio ao Hitec
+                                </div>
+                                <field name="cron_hour_send_hitec_weekday" widget="float_time"/>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="cron_hour_send_hitec_saturday"/>
+                                <div class="text-muted">
+                                    Horário (Brasília, Sábado) do mesmo envio ao Hitec
+                                </div>
+                                <field name="cron_hour_send_hitec_saturday" widget="float_time"/>
+                            </div>
+                        </div>
+                    </div>
+                </xpath>
+            </field>
+        </record>
     </data>
 </odoo>
