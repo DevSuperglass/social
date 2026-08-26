@@ -685,30 +685,11 @@ class MailGatewayWhatsappService(models.AbstractModel):
         return {}
 
     def send_tmpl_message(self, gateway_phone, tmpl_name, components, mobile_list, body_message):
-        _logger.info(
-            "[send_tmpl_message] chamado: gateway_phone=%s tmpl_name=%s "
-            "mobile_list=%s", gateway_phone, tmpl_name, mobile_list,
-        )
         gateway = self.env['mail.gateway'].search([('whatsapp_from_phone', '=', gateway_phone)], limit=1)
-        _logger.info(
-            "[send_tmpl_message] gateway resolvido: id=%s name=%s",
-            gateway.id, gateway.name,
-        )
         tmpl_id = self.env['whatsapp.template'].search([('name', '=', tmpl_name)], limit=1)
-        _logger.info(
-            "[send_tmpl_message] template resolvido: id=%s status=%s "
-            "template_name=%s lang_code=%s wa_account_id=%s",
-            tmpl_id.id, tmpl_id.status, tmpl_id.template_name,
-            tmpl_id.lang_code, tmpl_id.wa_account_id.id,
-        )
 
         for mobile in mobile_list:
-            _logger.info("[send_tmpl_message] criando mail.message para mobile=%s", mobile)
             message = self.create_message(mobile, body_message, gateway)
-            _logger.info(
-                "[send_tmpl_message] create_message retornou: %s",
-                message.id if message else message,
-            )
             if not message:
                 raise UserError(
                     f'O número de telefone {mobile} não é válido. Para realizar o envio, utilize o seguinte formato: 55DDD(9)Telefone. Exemplo: 5511912345678.')
@@ -731,17 +712,12 @@ class MailGatewayWhatsappService(models.AbstractModel):
                     'body': body_message,
                     'mail_message_id': message.id
                 })
-                _logger.info("[send_tmpl_message] whatsapp.template.waid criado para mail_message_id=%s", message.id)
             else:
                 json.update({"type": 'text',
                              "text": {
                                  "body": components
                              }})
 
-            _logger.info(
-                "[send_tmpl_message] criando whatsapp.request: to=%s json=%s",
-                mobile, json,
-            )
             self.env['whatsapp.request'].sudo().create({
                 'url': f'https://graph.facebook.com/v{gateway.whatsapp_version}/{gateway.whatsapp_from_phone}/messages',
                 'headers': {
@@ -751,22 +727,14 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 'json': json,
                 'mail_message_id': message.id,
             })
-            _logger.info("[send_tmpl_message] whatsapp.request criado com sucesso para mobile=%s", mobile)
         return True
 
     def create_message(self, mobile, body_message, gateway_id):
-        _logger.info(
-            "[create_message] mobile=%s gateway_id=%s", mobile, gateway_id.id,
-        )
         update = {
             'messages': [{'from': mobile}],
             'contacts': [{'wa_id': mobile, 'profile': {'name': mobile}}]
         }
         channel = self._get_channel(gateway_id, mobile, update, force_create=True)
-        _logger.info(
-            "[create_message] canal resolvido: %s",
-            channel.id if channel else channel,
-        )
 
         if channel:
             message = channel.with_context({
@@ -781,8 +749,6 @@ class MailGatewayWhatsappService(models.AbstractModel):
                 gateway_type="whatsapp",
                 date=datetime.today(),
             )
-            _logger.info("[create_message] mail.message criado: id=%s", message.id)
             self._post_process_message(message, channel)
             return message
-        _logger.info("[create_message] canal não resolvido — retornando None.")
         return None
