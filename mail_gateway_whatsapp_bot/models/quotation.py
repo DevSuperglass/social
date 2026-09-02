@@ -23,8 +23,14 @@ class Quotation(models.Model):
         """Cria normalmente (date/due_date calculados pelo date_deadline()
         padrão do cotacoes) e, só pras cotações do bot criadas depois do
         horário de corte do cron de envio ao Hitec, dá um write simulando
-        que a criação foi amanhã — só pra achar o próximo dia de rota certo,
-        evitando que a cotação vença antes do ciclo de amanhã processá-la."""
+        que a criação foi amanhã — hoje já era, o mais cedo que essa
+        cotação pode ser processada é o ciclo de amanhã, então date/
+        due_date precisam refletir isso: mesma regra de qualquer cotação
+        (próximo dia de rota A PARTIR do dia de criação), só que aplicada
+        a partir do dia de criação SIMULADO (amanhã), não do dia real de
+        hoje — por isso o +1 é somado ANTES de chamar
+        _compute_next_route_day_from (que soma outro +1 internamente,
+        igual calcula_vencimento/get_due_date faz a partir de "hoje")."""
         records = super().create(vals_list)
 
         bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
@@ -103,8 +109,10 @@ class Quotation(models.Model):
     def _utc_naive_to_brasilia_date(value):
         """Converte um Datetime UTC naive (como vem do ORM, ex.:
         hitec_send_date) pra date em Brasília — usado em
-        item_verification_response() pra saber se um clique do cliente
-        chegou num dia diferente de quando a cotação foi enviada ao Hitec."""
+        item_verification_response() pra saber se um item confirmado
+        pertence a uma cotação finalizada HOJE (mesmo dia) ou em outro
+        dia, e assim decidir entre simular "amanhã" ou usar a data de
+        hoje diretamente (ver _recover_confirmed_item)."""
         return pytz.utc.localize(value).astimezone(_BUSINESS_TZ).date()
 
     def _bot_cron_call_for_day(self, target_day, config_prefix, default_weekday, default_saturday):
@@ -183,17 +191,16 @@ class Quotation(models.Model):
             })
 
     def _compute_due_date_for(self, next_day_route):
-        """Mesma lógica de get_due_date() em cotacoes/quotation.py:
-        date_deadline(), reimplementada aqui pra não alterar o módulo base
-        (verticalização) — ajusta next_day_route pro dia útil/fds anterior
-        conforme os horários da rota.
+        """Idêntico a get_due_date() em cotacoes/quotation.py:
+        date_deadline() — reimplementado aqui pra não alterar o módulo base
+        (verticalização), mesmo cálculo, byte a byte. Ajusta next_day_route
+        pro dia útil/fds anterior conforme os horários da rota.
 
-        Diferente do original: due_datetime é montado em horário local
-        (America/Sao_Paulo, mesma convenção de business_day_time/
-        weekend_day_time) e só então convertido pra UTC antes de virar o
-        valor do campo Datetime — evitar isso fazia o Odoo tratar a meia-noite
-        local como se já fosse meia-noite UTC, adiantando o due_date em 3h e
-        exibindo o dia errado (um dia antes) pro usuário."""
+        Igual ao original: retorna o datetime "naive" direto, sem localizar/
+        converter fuso — é assim que o due_date de uma cotação criada
+        normalmente (via date_deadline(), sem passar por aqui) também é
+        gravado, então precisa bater byte a byte com esse comportamento pra
+        não divergir do valor que uma cotação "normal" (mesmo dia) teria."""
         self.ensure_one()
         route = self.partner_route_id
         due_datetime = datetime.datetime.combine(next_day_route, datetime.time(0, 0))
@@ -205,8 +212,7 @@ class Quotation(models.Model):
         else:
             due_datetime += datetime.timedelta(days=-1, hours=route.business_day_time)
 
-        localized = _BUSINESS_TZ.localize(due_datetime)
-        return localized.astimezone(pytz.utc).replace(tzinfo=None)
+        return due_datetime
 
     @api.model
     def _cron_confirm_bot_quotations(self):
@@ -303,7 +309,11 @@ class Quotation(models.Model):
         create_sale_order(), que confirma o sale.order e já dispara toda a
         cadeia existente até o Hitec (fatura → hitec_account_move._post() →
         _send_to_hitec() → database.request). Depende de payment_mode_id/
-        payment_term_id já preenchidos (feito em _cron_confirm_bot_quotations).
+        payment_term_id já preenchidos (feito em _cron_confirm_bot_quotations
+        ou na "janela" de item_verification_response) — se a cotação chegou
+        até aqui sem isso, o UserError de create_sale_order() é só logado
+        (não interrompe o cron pras demais cotações), sinalizando um
+        problema real a investigar, não corrigido silenciosamente aqui.
 
         Roda como o próprio SuperglassBot (with_user): create_sale_order()
         usa self.env.uid como vendedor do pedido, e _send_to_hitec() exige um
@@ -353,6 +363,14 @@ class Quotation(models.Model):
                 continue
             if lines.filtered(lambda l: l.status == 'pending'):
                 continue
+            # Garante payment_mode_id/payment_term_id mesmo que a cotação
+            # tenha chegado em approved_limit por um caminho que não passou
+            # por _cron_confirm_bot_quotations nem pela "janela" de
+            # item_verification_response (únicos dois pontos que hoje
+            # chamam isso antes de confirm_quotation()) — sem isso,
+            # create_sale_order() abaixo levanta UserError (capturado e só
+            # logado, nunca visível) e a cotação nunca sai do lugar.
+            quotation._set_payment_mode_and_term_from_partner()
             try:
                 quotation.with_user(bot_user).create_sale_order()
             except UserError as e:
@@ -362,13 +380,18 @@ class Quotation(models.Model):
                 )
 
     def _resolve_item_to_quotation(self, line, target_date=None, target_due_date=None):
-        """Move pra outra cotação (nova ou já aberta do mesmo cliente/
+        """Copia pra outra cotação (nova ou já aberta do mesmo cliente/
         vendedor) o item que acabou de ser confirmado — usado quando a
         cotação original não pode mais receber esse item: já foi
         finalizada (item órfão) ou a confirmação chegou depois do corte
         de hoje pro envio ao Hitec (precisa de data de amanhã) — ver
-        item_verification_response. Os demais itens (ainda não
-        resolvidos) continuam na cotação original.
+        item_verification_response.
+
+        COPIA a linha (não move/reparenta) — a linha original permanece
+        intacta na cotação de origem, que é histórico e não deve ser
+        alterado (produto, quantidade, preço, destinatário preservados
+        pelo copy() padrão). Quem chama decide o que fazer com o status da
+        linha original (ver _recover_confirmed_item).
 
         Reaproveita uma cotação já aberta do mesmo cliente/vendedor, se
         houver — mesmo critério que o chatbot usa ao criar linha nova
@@ -389,7 +412,10 @@ class Quotation(models.Model):
         o bot nos dois cenários que chamam este método (item órfão e
         confirmação tardia já conferem vendor == bot antes de chegar
         aqui) — pra criação/alteração ficarem atribuídas a ele no
-        chatter, não a quem processou o webhook."""
+        chatter, não a quem processou o webhook.
+
+        Retorna (target_quotation, new_line) — new_line é a cópia recém
+        criada na cotação de destino."""
         self.ensure_one()
         bot_user = self.vendor
         domain = [
@@ -419,8 +445,8 @@ class Quotation(models.Model):
             target_quotation = self.env['quotation'].with_user(bot_user).create(vals)
             target_quotation.with_user(bot_user).write({'name': "COTACAO{}".format(target_quotation.id)})
 
-        line.with_user(bot_user).write({'quotation_id': target_quotation.id})
-        return target_quotation
+        new_line = line.with_user(bot_user).copy({'quotation_id': target_quotation.id})
+        return target_quotation, new_line
 
     def _notify_client_item_moved(self, line, new_quotation, reason):
         """Avisa o cliente (recipient_id da linha) que a confirmação do
@@ -464,6 +490,55 @@ class Quotation(models.Model):
                 'Falha ao notificar cliente sobre item %s movido pra cotação %s (motivo=%s)',
                 line.id, new_quotation.id, reason,
             )
+
+    def _recover_confirmed_item(self, line, simulate_tomorrow):
+        """Move um item confirmado que não pode (mais) ficar na cotação
+        original para uma cotação nova/reaproveitada — chamado de dois
+        pontos de item_verification_response, que já decidem e passam
+        `simulate_tomorrow` de acordo com o cenário (ver lá):
+
+        - simulate_tomorrow=True ("confirmação após o horário, mesmo dia"):
+          hoje já era — cria/reaproveita cotação simulando que a criação
+          foi amanhã (mesma lógica de create()), pra date/due_date
+          refletirem o próximo dia de rota A PARTIR de amanhã, não de
+          hoje — reason 'next_delivery'.
+        - simulate_tomorrow=False ("item de cotação já finalizada em dia
+          diferente, ou ainda dentro do horário de hoje"): cria/reaproveita
+          com a data de HOJE (dia da própria confirmação), sem simular
+          nada — reason 'orphan'.
+
+        A linha original NUNCA é removida/reparentada (ver
+        _resolve_item_to_quotation) — fica intacta na cotação de origem,
+        como histórico. Só ajusta o status dela se estava 'confirmed'
+        (cenário "mesmo dia, ainda aberta": super() já tinha gravado isso
+        antes): regrava pra 'givenup', senão a cotação de origem ficaria
+        com uma linha confirmada que os crons de hoje poderiam processar
+        de novo, duplicando o envio do mesmo item."""
+        self.ensure_one()
+        bot_user = self.vendor
+        if simulate_tomorrow:
+            route = self.partner_route_id
+            # Hoje já era — simula que a criação foi amanhã (mesma lógica
+            # de create()): soma +1 ANTES de chamar
+            # _compute_next_route_day_from, que soma outro +1 internamente
+            # a partir desse dia simulado.
+            next_day_route = route._compute_next_route_day_from(
+                fields.Date.context_today(self) + datetime.timedelta(days=1)
+            )
+            due_date = self._compute_due_date_for(next_day_route)
+            target_quotation, new_line = self._resolve_item_to_quotation(
+                line, target_date=next_day_route, target_due_date=due_date,
+            )
+            reason = 'next_delivery'
+        else:
+            target_quotation, new_line = self._resolve_item_to_quotation(line)
+            reason = 'orphan'
+
+        new_line.with_user(bot_user).write({'status': 'confirmed'})
+        if line.status == 'confirmed':
+            line.with_user(bot_user).write({'status': 'givenup'})
+        self._notify_client_item_moved(new_line, target_quotation, reason=reason)
+        return target_quotation
 
     def _build_bot_load_message(self):
         """Monta o texto de pré-carregamento com os itens confirmados —
@@ -514,33 +589,26 @@ class Quotation(models.Model):
         nenhuma interferência daqui.
 
         Além disso, trata 2 cenários específicos de cotação do bot em que
-        CONFIRMAR normal não é suficiente:
+        CONFIRMAR normal não é suficiente — em ambos, o item é movido pra
+        uma cotação nova/reaproveitada via _recover_confirmed_item, que
+        decide a data (hoje ou amanhã) só pelo horário atual em relação ao
+        corte de envio ao Hitec, não por comparação de dias:
 
-        - Item "órfão": a cotação já foi enviada ao Hitec (create_sale_order,
-          processando os itens que já estavam confirmados nesse momento — o
-          cron de envio só exige ausência de status 'pending', não considera
-          itens ainda 'waiting'), e esse item específico só é confirmado
-          pelo cliente depois, em outro dia. Nesse ponto a linha já foi
-          virada 'givenup' automaticamente (pelo próprio envio/confirmação),
-          então não dá pra usar o status da linha como sinal de "ainda
-          pendente" — em vez disso, compara o dia de hoje com o dia de
-          hitec_send_date (gravado em hitec_account_move._send_to_hitec
-          quando a cotação é de fato enviada): se forem dias diferentes, o
-          clique chegou depois da cotação já ter sido processada. Sem esse
-          tratamento, o guard padrão de item_verification_response
-          (cotacoes, baseado só no state da cotação) bloquearia com uma
-          mensagem enganosa ("está em processamento") e nunca gravaria
-          nada. Resolvido criando/reaproveitando uma cotação com a data de
-          HOJE (ver _resolve_item_to_quotation).
+        - Cotação já fully_approved (foi enviada ao Hitec — create_sale_order
+          processa os itens que já estavam confirmados nesse momento; o
+          cron de envio só exige ausência de status 'pending', não
+          considera itens ainda 'waiting'). O guard padrão de
+          item_verification_response (cotacoes, baseado só no state da
+          cotação) bloquearia com uma mensagem enganosa ("está em
+          processamento") e nunca gravaria nada — nem quando o cliente
+          confirma ainda no MESMO dia em que a cotação foi enviada, então
+          não dá pra usar comparação de dia como critério aqui.
 
-        - Confirmação tardia (depois do corte de envio ao Hitec de hoje): o
-          cron de envio ao Hitec já passou — mesmo confirmando agora, só
-          seria pega pelo cron de amanhã, mas com a data de hoje gravada
-          (errada pro que de fato vai ser processado amanhã). Resolvido
-          criando/reaproveitando uma cotação com a data de AMANHÃ (mesmo
-          cálculo de rota usado em create()) em vez de só avisar o cliente
-          por texto sem mover nada (como fazia antes, via
-          _dispatch_to_ai_agent).
+        - Cotação ainda aberta, mas a confirmação chegou depois do corte de
+          envio ao Hitec de hoje: o cron de envio já passou — mesmo
+          confirmando agora, só seria pega pelo cron de amanhã, mas com a
+          data de hoje gravada (errada pro que de fato vai ser processado
+          amanhã).
 
         Fora desses dois casos, mas ainda dentro da janela entre o corte de
         confirmação e o corte de envio ao Hitec de hoje, confirma a cotação
@@ -565,29 +633,34 @@ class Quotation(models.Model):
         bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
         is_bot_quotation = bool(bot_user and quotation_id and quotation_id.vendor.id == bot_user.id)
 
-        # Item órfão: cotação do bot já finalizada num dia diferente do
-        # clique atual (ver docstring acima).
+        # Cotação do bot já fully_approved: super() nem chegaria a gravar o
+        # status — o guard de state bloquearia antes. Recupera o item
+        # direto daqui, independente de que dia a cotação foi finalizada.
         orphan_line = self.env['quotation.line']
         orphan_target_quotation = self.env['quotation']
-        if button == 'CONFIRMAR' and is_bot_quotation and quotation_id.hitec_send_date and (
-            self._utc_naive_to_brasilia_date(quotation_id.hitec_send_date)
-            != self._utc_naive_to_brasilia_date(fields.Datetime.now())
-        ):
+        if button == 'CONFIRMAR' and is_bot_quotation and quotation_id.state == 'fully_approved':
             candidate_line = quotation_id.quotation_line_ids.with_context(lang="en_US").filtered(
                 lambda ql: ql.product_id.name == product_name
                 and ql.product_id.conf_provider_id.provider_id.name == provider_name
             )
             if candidate_line:
-                # super() nem chegaria a gravar isso — o guard de state
-                # da cotação (fully_approved) bloquearia antes. Move
-                # PRIMEIRO pra cotação nova/reaproveitada — a linha mantém
-                # o status anterior (ex.: givenup) intacto na cotação
-                # antiga, que já foi finalizada e não deve refletir essa
-                # confirmação tardia — e só DEPOIS grava confirmed, já na
-                # nova.
-                orphan_target_quotation = quotation_id._resolve_item_to_quotation(candidate_line)
-                candidate_line.with_user(bot_user).write({'status': 'confirmed'})
-                quotation_id._notify_client_item_moved(candidate_line, orphan_target_quotation, reason='orphan')
+                # simulate_tomorrow só é True se a cotação foi finalizada
+                # HOJE (mesmo dia da confirmação) — item confirmado depois
+                # do corte de hoje, mesma regra de "confirmação tardia"
+                # (linha ~679). Se foi finalizada em outro dia (ontem ou
+                # antes), a data usada é a de HOJE (dia da confirmação),
+                # sem simular nada, independente de já ter passado do
+                # corte de hoje ou não.
+                simulate_tomorrow = bool(
+                    quotation_id.hitec_send_date
+                    and self._utc_naive_to_brasilia_date(quotation_id.hitec_send_date)
+                    == self._utc_naive_to_brasilia_date(fields.Datetime.now())
+                )
+                # _recover_confirmed_item copia a linha pra cotação
+                # nova/reaproveitada (já gravando confirmed na cópia) — a
+                # linha original permanece intacta, como histórico, na
+                # cotação antiga já finalizada.
+                orphan_target_quotation = quotation_id._recover_confirmed_item(candidate_line, simulate_tomorrow)
                 orphan_line = candidate_line
 
         result = True if orphan_line else super().item_verification_response()
@@ -605,11 +678,11 @@ class Quotation(models.Model):
         # A partir daqui, "target_quotation" é a cotação que de fato tem o
         # item que acabou de ser confirmado — normalmente a própria
         # quotation_id, mas pode virar uma cotação nova/reaproveitada nos
-        # blocos abaixo (ou já ser a cotação do item órfão, tratado acima).
+        # blocos abaixo (ou já ser a cotação da recuperação, tratada acima).
         # "confirmed_line" identifica esse item (mesmo matching de
-        # produto+fabricante do método base) — super() (ou o tratamento de
-        # item órfão acima) já gravou status='confirmed' nele antes da
-        # gente chegar aqui.
+        # produto+fabricante do método base) — super() (ou a recuperação
+        # acima) já gravou status='confirmed' nele antes da gente chegar
+        # aqui.
         target_quotation = orphan_target_quotation if orphan_line else quotation_id
         confirmed_line = orphan_line
         if button == 'CONFIRMAR' and not confirmed_line:
@@ -624,18 +697,10 @@ class Quotation(models.Model):
                 # Confirmação tardia: já passou do corte de envio ao Hitec
                 # de hoje — mesmo confirmando agora, só seria pega pelo
                 # cron de amanhã, mas com a data de hoje gravada (errada
-                # pro que vai ser processado amanhã). Cria/reaproveita
-                # cotação com a data de amanhã (mesmo cálculo de rota de
-                # create()).
-                route = quotation_id.partner_route_id
-                next_day_route = route._compute_next_route_day_from(
-                    fields.Date.context_today(self) + datetime.timedelta(days=1)
-                )
-                due_date = quotation_id._compute_due_date_for(next_day_route)
-                target_quotation = quotation_id._resolve_item_to_quotation(
-                    confirmed_line[0], target_date=next_day_route, target_due_date=due_date,
-                )
-                quotation_id._notify_client_item_moved(confirmed_line[0], target_quotation, reason='next_delivery')
+                # pro que vai ser processado amanhã). Sempre "mesmo dia"
+                # aqui (avaliado em tempo real, a cotação ainda estava
+                # aberta até agora) — sempre simula amanhã.
+                target_quotation = quotation_id._recover_confirmed_item(confirmed_line[0], simulate_tomorrow=True)
 
             elif target_quotation._is_past_confirm_cutoff():
                 # Janela entre o corte de confirmação e o corte de envio ao
