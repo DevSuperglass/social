@@ -4,7 +4,7 @@ import re
 
 import pytz
 
-from odoo import api, models
+from odoo import api, fields, models
 from odoo.exceptions import UserError
 
 _BUSINESS_TZ = pytz.timezone('America/Sao_Paulo')
@@ -46,24 +46,40 @@ class Quotation(models.Model):
 
         return records
 
-    def _is_past_hitec_cutoff(self):
-        """Horário de corte de HOJE pro cron de envio ao Hitec, considerando
-        dia útil (segunda a sexta) x sábado — configurável em Configurações >
-        Cotações > Horários (cotacoes.cron_hour_send_hitec_weekday/_saturday).
-        Não lê mais cron.nextcall: como sábado pode ter horário diferente do
-        dia útil, nextcall passou a variar por dia da semana (reflete a
-        PRÓXIMA execução, não necessariamente o horário de HOJE) — calcular
-        direto da config evita essa inconsistência.
+    def _is_past_cutoff(self, config_prefix, default_weekday, default_saturday):
+        """Verifica se já passou do horário de corte (Brasília) de HOJE pra
+        um cron do bot (`config_prefix`), considerando dia útil (segunda a
+        sexta) x sábado — configurável em Configurações > Cotações >
+        Horários (cotacoes.{config_prefix}_weekday/_saturday).
+        Não lê cron.nextcall: como sábado pode ter horário diferente do dia
+        útil, nextcall passou a variar por dia da semana (reflete a PRÓXIMA
+        execução, não necessariamente o horário de HOJE) — calcular direto
+        da config evita essa inconsistência.
         Sem cron aos domingos: trata domingo como sempre "passado do corte",
         caindo no próximo dia útil de rota."""
         today = datetime.datetime.now(pytz.utc).astimezone(_BUSINESS_TZ).date()
         if today.weekday() == 6:
             return True
         hour_brasilia = self._get_bot_cron_hour(
-            'cron_hour_send_hitec', 16.5, 16.5, today.weekday()
+            config_prefix, default_weekday, default_saturday, today.weekday()
         )
         cutoff_time = self._brasilia_hour_to_utc_time(hour_brasilia)
         return datetime.datetime.utcnow().time() > cutoff_time
+
+    def _is_past_confirm_cutoff(self):
+        """Horário de corte de HOJE pro cron de confirmação automática
+        (cron_hour_confirm) — ver _is_past_cutoff."""
+        return self._is_past_cutoff('cron_hour_confirm', 16.0, 16.0)
+
+    def _is_past_notify_loaded_cutoff(self):
+        """Horário de corte de HOJE pro cron de aviso de carregamento
+        (cron_hour_notify_loaded) — ver _is_past_cutoff."""
+        return self._is_past_cutoff('cron_hour_notify_loaded', 16.25, 16.25)
+
+    def _is_past_hitec_cutoff(self):
+        """Horário de corte de HOJE pro cron de envio ao Hitec
+        (cron_hour_send_hitec) — ver _is_past_cutoff."""
+        return self._is_past_cutoff('cron_hour_send_hitec', 16.5, 16.5)
 
     def _get_bot_cron_hour(self, config_prefix, default_weekday, default_saturday, weekday):
         """Horário (Brasília) configurado pra um cron do bot no dia de semana
@@ -82,6 +98,14 @@ class Quotation(models.Model):
         hh = int(hour_utc)
         mm = int(round((hour_utc - hh) * 60))
         return datetime.time(hh, mm)
+
+    @staticmethod
+    def _utc_naive_to_brasilia_date(value):
+        """Converte um Datetime UTC naive (como vem do ORM, ex.:
+        hitec_send_date) pra date em Brasília — usado em
+        item_verification_response() pra saber se um clique do cliente
+        chegou num dia diferente de quando a cotação foi enviada ao Hitec."""
+        return pytz.utc.localize(value).astimezone(_BUSINESS_TZ).date()
 
     def _bot_cron_call_for_day(self, target_day, config_prefix, default_weekday, default_saturday):
         """Data/hora (UTC) pro cron do bot no dia informado — pula domingo
@@ -305,6 +329,142 @@ class Quotation(models.Model):
             except UserError as e:
                 _logger.warning('Cron envio Hitec bot: cotação %s não convertida em pedido: %s', quotation.id, e)
 
+    def _maybe_send_to_hitec_after_gerproc_approval(self):
+        """Chamado por project_request.approve_quote() (aprovação do gerproc,
+        em mail_gateway_whatsapp_bot/models/project_request.py) quando a
+        cotação aprovada é do bot. Se a aprovação aconteceu depois do
+        horário de corte do cron de envio ao Hitec do dia, dispara o envio
+        direto — mesmo processo de _cron_send_bot_quotations_to_hitec — em
+        vez de deixar a cotação esperando o próximo ciclo do cron, no dia
+        seguinte."""
+        bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
+        if not bot_user:
+            return
+
+        for quotation in self:
+            if quotation.vendor.id != bot_user.id:
+                continue
+            if quotation.sale_order_id:
+                continue
+            if not quotation._is_past_hitec_cutoff():
+                continue
+            lines = quotation.quotation_line_ids
+            if not lines.filtered(lambda l: l.status == 'confirmed'):
+                continue
+            if lines.filtered(lambda l: l.status == 'pending'):
+                continue
+            try:
+                quotation.with_user(bot_user).create_sale_order()
+            except UserError as e:
+                _logger.warning(
+                    'Envio Hitec pós-aprovação gerproc: cotação %s não convertida em pedido: %s',
+                    quotation.id, e,
+                )
+
+    def _resolve_item_to_quotation(self, line, target_date=None, target_due_date=None):
+        """Move pra outra cotação (nova ou já aberta do mesmo cliente/
+        vendedor) o item que acabou de ser confirmado — usado quando a
+        cotação original não pode mais receber esse item: já foi
+        finalizada (item órfão) ou a confirmação chegou depois do corte
+        de hoje pro envio ao Hitec (precisa de data de amanhã) — ver
+        item_verification_response. Os demais itens (ainda não
+        resolvidos) continuam na cotação original.
+
+        Reaproveita uma cotação já aberta do mesmo cliente/vendedor, se
+        houver — mesmo critério que o chatbot usa ao criar linha nova
+        (chatbot/database.py, create_quotation_line: state not in
+        ('expired', 'fully_approved')) — em vez de criar uma cotação nova
+        a cada item. Quando target_date é informado (cenário "amanhã"),
+        restringe a busca a cotações que já tenham essa mesma data, pra
+        não misturar um item de amanhã numa cotação aberta de hoje. Sem
+        target_date (cenário "hoje"/item órfão), não restringe por data —
+        mesmo comportamento livre que o chatbot já usa.
+
+        Cotação nova (quando precisa criar): sem target_date, passa pelo
+        create() normal (date/due_date calculados do zero por
+        date_deadline(), refletindo hoje). Com target_date, grava
+        date/due_date explícitos.
+
+        Roda como o próprio SuperglassBot (with_user) — self.vendor já é
+        o bot nos dois cenários que chamam este método (item órfão e
+        confirmação tardia já conferem vendor == bot antes de chegar
+        aqui) — pra criação/alteração ficarem atribuídas a ele no
+        chatter, não a quem processou o webhook."""
+        self.ensure_one()
+        bot_user = self.vendor
+        domain = [
+            ('partner_id', '=', self.partner_id.id),
+            ('vendor', '=', bot_user.id),
+            ('state', 'not in', ('expired', 'fully_approved')),
+            ('id', '!=', self.id),
+        ]
+        if target_date:
+            domain.append(('date', '=', target_date))
+        target_quotation = self.with_user(bot_user).search(domain, order='create_date desc', limit=1)
+
+        if not target_quotation:
+            # Mesmo padrão usado pelo chatbot ao criar cotação nova
+            # (chatbot/database.py, create_quotation_line): state explícito
+            # na criação, e name (número da cotação, "COTACAOxx") gravado à
+            # parte depois — não é preenchido sozinho, e o form/relatórios
+            # usam o campo em si, não name_get().
+            vals = {
+                'partner_id': self.partner_id.id,
+                'vendor': bot_user.id,
+                'state': 'opened',
+            }
+            if target_date:
+                vals['date'] = target_date
+                vals['due_date'] = target_due_date
+            target_quotation = self.env['quotation'].with_user(bot_user).create(vals)
+            target_quotation.with_user(bot_user).write({'name': "COTACAO{}".format(target_quotation.id)})
+
+        line.with_user(bot_user).write({'quotation_id': target_quotation.id})
+        return target_quotation
+
+    def _notify_client_item_moved(self, line, new_quotation, reason):
+        """Avisa o cliente (recipient_id da linha) que a confirmação do
+        produto foi registrada, mas caiu numa cotação diferente da
+        original (ver _resolve_item_to_quotation). reason='orphan':
+        pedido de origem já tinha sido processado (finalizado em outro
+        dia). reason='next_delivery': confirmação chegou depois do corte
+        de hoje pro envio ao Hitec, item vai pra próxima entrega. Falha
+        ao notificar (ex.: telefone inválido) nunca deve derrubar a
+        transação — o item já foi movido/confirmado com sucesso nesse
+        ponto."""
+        self.ensure_one()
+        try:
+            mobile = line.recipient_id.phone_sanitized
+            if not mobile:
+                return
+            mobile = mobile.split('+')[1]
+            if reason == 'next_delivery':
+                date_str = new_quotation.date.strftime('%d/%m/%Y') if new_quotation.date else '-'
+                body = (
+                    f"A confirmação do produto {line.product_id.name} foi registrada "
+                    f"com sucesso! Em razão do horário, ela será processada na "
+                    f"próxima entrega: {date_str} (Cotação Nº {new_quotation.id})."
+                )
+            else:
+                body = (
+                    f"A confirmação do produto {line.product_id.name} foi registrada "
+                    f"com sucesso! Como o pedido anterior já havia sido processado, "
+                    f"esse item foi incluído automaticamente na Cotação Nº "
+                    f"{new_quotation.id}."
+                )
+            self.env['mail.gateway.whatsapp'].with_context(is_internal=True).send_tmpl_message(
+                gateway_phone='335789752960181',
+                tmpl_name=None,
+                components=body,
+                mobile_list=[mobile],
+                body_message=body,
+            )
+        except Exception:
+            _logger.exception(
+                'Falha ao notificar cliente sobre item %s movido pra cotação %s (motivo=%s)',
+                line.id, new_quotation.id, reason,
+            )
+
     def _build_bot_load_message(self):
         """Monta o texto de pré-carregamento com os itens confirmados —
         campos do relatório 'Carregamento' (Produto, Ref. Fornecedor,
@@ -349,52 +509,177 @@ class Quotation(models.Model):
         limpar a sessão — mas só quando o canal do clique realmente está em
         atendimento bot (evita fechar a fila errada se o time de logística
         clicar nos mesmos botões no template validacao_produto, que usa outro
-        canal)."""
+        canal). Cotação de vendedor humano (ou qualquer coisa fora dos 2
+        cenários abaixo) segue o comportamento padrão do cotacoes, sem
+        nenhuma interferência daqui.
+
+        Além disso, trata 2 cenários específicos de cotação do bot em que
+        CONFIRMAR normal não é suficiente:
+
+        - Item "órfão": a cotação já foi enviada ao Hitec (create_sale_order,
+          processando os itens que já estavam confirmados nesse momento — o
+          cron de envio só exige ausência de status 'pending', não considera
+          itens ainda 'waiting'), e esse item específico só é confirmado
+          pelo cliente depois, em outro dia. Nesse ponto a linha já foi
+          virada 'givenup' automaticamente (pelo próprio envio/confirmação),
+          então não dá pra usar o status da linha como sinal de "ainda
+          pendente" — em vez disso, compara o dia de hoje com o dia de
+          hitec_send_date (gravado em hitec_account_move._send_to_hitec
+          quando a cotação é de fato enviada): se forem dias diferentes, o
+          clique chegou depois da cotação já ter sido processada. Sem esse
+          tratamento, o guard padrão de item_verification_response
+          (cotacoes, baseado só no state da cotação) bloquearia com uma
+          mensagem enganosa ("está em processamento") e nunca gravaria
+          nada. Resolvido criando/reaproveitando uma cotação com a data de
+          HOJE (ver _resolve_item_to_quotation).
+
+        - Confirmação tardia (depois do corte de envio ao Hitec de hoje): o
+          cron de envio ao Hitec já passou — mesmo confirmando agora, só
+          seria pega pelo cron de amanhã, mas com a data de hoje gravada
+          (errada pro que de fato vai ser processado amanhã). Resolvido
+          criando/reaproveitando uma cotação com a data de AMANHÃ (mesmo
+          cálculo de rota usado em create()) em vez de só avisar o cliente
+          por texto sem mover nada (como fazia antes, via
+          _dispatch_to_ai_agent).
+
+        Fora desses dois casos, mas ainda dentro da janela entre o corte de
+        confirmação e o corte de envio ao Hitec de hoje, confirma a cotação
+        direto (mais abaixo) — o cron de confirmação já rodou e não roda de
+        novo, e o de envio ao Hitec só pega cotação já confirmada."""
         button = self.env.context.get('button')
         waid = self.env.context.get('waid')
 
-        result = super().item_verification_response()
+        message = self.env['mail.message'].search([('whatsapp_id', '=', waid)])
+        quotation_id = self.env['quotation']
+        product_name = ''
+        provider_name = ''
+        if message:
+            quotation_match = re.search(r'Cotação Nº: (\d+)', message.body or '')
+            if quotation_match:
+                quotation_id = self.browse(int(quotation_match.group(1)))
+            product_match = re.search(r'Produto: (.+?)(?=\n|<)', message.body or '')
+            product_name = product_match.group(1) if product_match else ''
+            provider_match = re.search(r'Fabricante: (.+?)(?=\n|<)', message.body or '')
+            provider_name = provider_match.group(1) if provider_match else ''
+
+        bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
+        is_bot_quotation = bool(bot_user and quotation_id and quotation_id.vendor.id == bot_user.id)
+
+        # Item órfão: cotação do bot já finalizada num dia diferente do
+        # clique atual (ver docstring acima).
+        orphan_line = self.env['quotation.line']
+        orphan_target_quotation = self.env['quotation']
+        if button == 'CONFIRMAR' and is_bot_quotation and quotation_id.hitec_send_date and (
+            self._utc_naive_to_brasilia_date(quotation_id.hitec_send_date)
+            != self._utc_naive_to_brasilia_date(fields.Datetime.now())
+        ):
+            candidate_line = quotation_id.quotation_line_ids.with_context(lang="en_US").filtered(
+                lambda ql: ql.product_id.name == product_name
+                and ql.product_id.conf_provider_id.provider_id.name == provider_name
+            )
+            if candidate_line:
+                # super() nem chegaria a gravar isso — o guard de state
+                # da cotação (fully_approved) bloquearia antes. Move
+                # PRIMEIRO pra cotação nova/reaproveitada — a linha mantém
+                # o status anterior (ex.: givenup) intacto na cotação
+                # antiga, que já foi finalizada e não deve refletir essa
+                # confirmação tardia — e só DEPOIS grava confirmed, já na
+                # nova.
+                orphan_target_quotation = quotation_id._resolve_item_to_quotation(candidate_line)
+                candidate_line.with_user(bot_user).write({'status': 'confirmed'})
+                quotation_id._notify_client_item_moved(candidate_line, orphan_target_quotation, reason='orphan')
+                orphan_line = candidate_line
+
+        result = True if orphan_line else super().item_verification_response()
 
         if button not in ('CONFIRMAR', 'DESISTIR'):
             return result
 
-        message = self.env['mail.message'].search([('whatsapp_id', '=', waid)])
-        if not message:
+        if not message or not quotation_id:
             return result
 
-        quotation_match = re.search(r'Cotação Nº: (\d+)', message.body or '')
-        if not quotation_match:
-            return result
-
-        product_match = re.search(r'Produto: (.+?)(?=\n|<)', message.body or '')
-        product_name = product_match.group(1) if product_match else ''
-
-        quotation_id = self.browse(int(quotation_match.group(1)))
-        if quotation_id.state in ('fully_approved', 'expired', 'review'):
+        if not orphan_line and quotation_id.state in ('fully_approved', 'expired', 'review'):
             # Mesmo gate do método base: não houve alteração de status real.
             return result
+
+        # A partir daqui, "target_quotation" é a cotação que de fato tem o
+        # item que acabou de ser confirmado — normalmente a própria
+        # quotation_id, mas pode virar uma cotação nova/reaproveitada nos
+        # blocos abaixo (ou já ser a cotação do item órfão, tratado acima).
+        # "confirmed_line" identifica esse item (mesmo matching de
+        # produto+fabricante do método base) — super() (ou o tratamento de
+        # item órfão acima) já gravou status='confirmed' nele antes da
+        # gente chegar aqui.
+        target_quotation = orphan_target_quotation if orphan_line else quotation_id
+        confirmed_line = orphan_line
+        if button == 'CONFIRMAR' and not confirmed_line:
+            confirmed_line = quotation_id.quotation_line_ids.with_context(lang="en_US").filtered(
+                lambda ql: ql.product_id.name == product_name
+                and ql.product_id.conf_provider_id.provider_id.name == provider_name
+                and ql.status == 'confirmed'
+            )
+
+        if button == 'CONFIRMAR' and confirmed_line and not orphan_line and is_bot_quotation:
+            if target_quotation._is_past_hitec_cutoff():
+                # Confirmação tardia: já passou do corte de envio ao Hitec
+                # de hoje — mesmo confirmando agora, só seria pega pelo
+                # cron de amanhã, mas com a data de hoje gravada (errada
+                # pro que vai ser processado amanhã). Cria/reaproveita
+                # cotação com a data de amanhã (mesmo cálculo de rota de
+                # create()).
+                route = quotation_id.partner_route_id
+                next_day_route = route._compute_next_route_day_from(
+                    fields.Date.context_today(self) + datetime.timedelta(days=1)
+                )
+                due_date = quotation_id._compute_due_date_for(next_day_route)
+                target_quotation = quotation_id._resolve_item_to_quotation(
+                    confirmed_line[0], target_date=next_day_route, target_due_date=due_date,
+                )
+                quotation_id._notify_client_item_moved(confirmed_line[0], target_quotation, reason='next_delivery')
+
+            elif target_quotation._is_past_confirm_cutoff():
+                # Janela entre o corte de confirmação e o corte de envio ao
+                # Hitec: o cron de confirmação (mais cedo) já rodou e não
+                # roda de novo hoje, e o cron de envio ao Hitec (mais
+                # tarde) ainda não passou — confirma direto, mesmas
+                # condições do cron (_cron_confirm_bot_quotations), pra ele
+                # já achar a cotação pronta.
+                lines = target_quotation.quotation_line_ids
+                if lines.filtered(lambda l: l.status == 'confirmed') and not lines.filtered(lambda l: l.status == 'pending'):
+                    target_quotation._set_payment_mode_and_term_from_partner()
+                    confirmed_now = False
+                    try:
+                        target_quotation.confirm_quotation()
+                        confirmed_now = True
+                    except UserError as e:
+                        _logger.warning(
+                            'Confirmação imediata (janela confirm→hitec): cotação %s não confirmada: %s',
+                            target_quotation.id, e,
+                        )
+
+                    # Distinção entre a subjanela confirm→notify_loaded (só
+                    # confirma, o cron de aviso de carregamento ainda vai
+                    # rodar hoje e pega essa cotação normalmente) e
+                    # notify_loaded→hitec (o cron de aviso já rodou e NÃO
+                    # pegou essa cotação, porque ela ainda não estava
+                    # confirmada nesse momento — sem isso, o aviso só
+                    # sairia amanhã). Nesse segundo caso, marca is_loaded e
+                    # regrava o status da linha confirmada: isso reaproveita
+                    # o mesmo aviso de "inclusão" que quotation.line.write()
+                    # (cotacoes) já dispara sozinho sempre que uma linha
+                    # vira confirmed com a cotação já carregada — não
+                    # precisa (nem deve) montar mensagem nova.
+                    if (
+                        confirmed_now
+                        and target_quotation._is_past_notify_loaded_cutoff()
+                        and not target_quotation.is_loaded
+                    ):
+                        target_quotation.set_is_loaded()
+                        confirmed_line.write({'status': 'confirmed'})
 
         channel = self.env['mail.channel'].browse(message.res_id)
         if channel.exists() and channel.attendance_type == 'bot':
             channel.delete_password_queue()
             channel._notify_chatbot_clear_session(channel.id)
-
-            if button == 'CONFIRMAR' and quotation_id._is_past_hitec_cutoff():
-                # message aqui é o template original (usado só pro regex acima),
-                # não o clique em si — author_id dele é o próprio SuperglassBot.
-                # Sobrescreve tudo que _dispatch_to_ai_agent tiraria de message
-                # (message/is_button/partner_id/author_name) com os valores
-                # certos: o botão clicado e o cliente real (recipient_id da
-                # linha, não partner_id da cotação, que é a empresa).
-                client_partner = quotation_id.quotation_line_ids[:1].recipient_id or quotation_id.partner_id
-                channel._dispatch_to_ai_agent(message, extra_payload={
-                    'message': 'CONFIRMAR',
-                    'is_button': True,
-                    'partner_id': client_partner.id if client_partner else None,
-                    'author_name': client_partner.name if client_partner else None,
-                    'next_delivery_date': quotation_id.date.isoformat() if quotation_id.date else None,
-                    'route_name': quotation_id.partner_route_id.nome_rota or None,
-                    'product_name': product_name or None,
-                })
 
         return result

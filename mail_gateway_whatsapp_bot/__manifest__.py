@@ -7,6 +7,7 @@
     'depends': [
         'cotacoes',
         'mail_gateway_whatsapp',
+        'hitec_account_move',
     ],
     'data': [
         'security/ir.model.access.csv',
