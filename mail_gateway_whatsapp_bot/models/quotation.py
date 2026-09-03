@@ -633,33 +633,42 @@ class Quotation(models.Model):
         bot_user = self.env.ref('mail_gateway_whatsapp_bot.superglassbot_user', raise_if_not_found=False)
         is_bot_quotation = bool(bot_user and quotation_id and quotation_id.vendor.id == bot_user.id)
 
-        # Cotação do bot já fully_approved: super() nem chegaria a gravar o
-        # status — o guard de state bloquearia antes. Recupera o item
-        # direto daqui, independente de que dia a cotação foi finalizada.
+        # Cotação do bot já fully_approved OU expired: super() nem chegaria
+        # a gravar o status — o guard de state bloquearia antes. Recupera o
+        # item direto daqui.
         orphan_line = self.env['quotation.line']
         orphan_target_quotation = self.env['quotation']
-        if button == 'CONFIRMAR' and is_bot_quotation and quotation_id.state == 'fully_approved':
+        if button == 'CONFIRMAR' and is_bot_quotation and quotation_id.state in ('fully_approved', 'expired'):
             candidate_line = quotation_id.quotation_line_ids.with_context(lang="en_US").filtered(
                 lambda ql: ql.product_id.name == product_name
                 and ql.product_id.conf_provider_id.provider_id.name == provider_name
             )
             if candidate_line:
-                # simulate_tomorrow só é True se a cotação foi finalizada
-                # HOJE (mesmo dia da confirmação) — item confirmado depois
-                # do corte de hoje, mesma regra de "confirmação tardia"
-                # (linha ~679). Se foi finalizada em outro dia (ontem ou
-                # antes), a data usada é a de HOJE (dia da confirmação),
-                # sem simular nada, independente de já ter passado do
-                # corte de hoje ou não.
-                simulate_tomorrow = bool(
-                    quotation_id.hitec_send_date
-                    and self._utc_naive_to_brasilia_date(quotation_id.hitec_send_date)
-                    == self._utc_naive_to_brasilia_date(fields.Datetime.now())
-                )
+                # expired: sempre cenário 3 — cria/reaproveita com a data
+                # de HOJE (dia da confirmação), nunca simula amanhã. Não
+                # reaproveita a comparação por hitec_send_date usada no
+                # fully_approved (só esse cenário está sendo tratado agora
+                # pro caso expired).
+                #
+                # fully_approved: simulate_tomorrow só é True se a cotação
+                # foi finalizada HOJE (mesmo dia da confirmação) — item
+                # confirmado depois do corte de hoje, mesma regra de
+                # "confirmação tardia" (linha ~679). Se foi finalizada em
+                # outro dia (ontem ou antes), a data usada é a de HOJE (dia
+                # da confirmação), sem simular nada, independente de já ter
+                # passado do corte de hoje ou não.
+                if quotation_id.state == 'expired':
+                    simulate_tomorrow = False
+                else:
+                    simulate_tomorrow = bool(
+                        quotation_id.hitec_send_date
+                        and self._utc_naive_to_brasilia_date(quotation_id.hitec_send_date)
+                        == self._utc_naive_to_brasilia_date(fields.Datetime.now())
+                    )
                 # _recover_confirmed_item copia a linha pra cotação
                 # nova/reaproveitada (já gravando confirmed na cópia) — a
                 # linha original permanece intacta, como histórico, na
-                # cotação antiga já finalizada.
+                # cotação antiga já finalizada/expirada.
                 orphan_target_quotation = quotation_id._recover_confirmed_item(candidate_line, simulate_tomorrow)
                 orphan_line = candidate_line
 
