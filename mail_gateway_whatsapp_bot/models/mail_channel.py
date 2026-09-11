@@ -64,6 +64,9 @@ class Channel(models.Model):
             'partner_id': partner.id if partner else None,
             'author_name': partner.name if partner else None,
             'is_button': bool(self.env.context.get('is_button')),
+            # Foto/áudio/arquivo sem texto: o chatbot troca a mensagem vazia pelo
+            # marcador [ANEXO] e pede os dados em texto, em vez de descartar.
+            'has_attachment': bool(message.attachment_ids),
         }
 
         channel_id = self.id
