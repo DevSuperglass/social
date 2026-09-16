@@ -60,14 +60,26 @@ class Channel(models.Model):
         # Imagens vão em base64 no payload pra o chatbot poder de fato "ver"
         # (leitura de modelo/placa/código gravado no vidro) — antes só o
         # marcador [ANEXO] chegava, sem o conteúdo. Só mimetype image/*;
-        # áudio/documento continuam só com o marcador (has_attachment).
+        # áudio/documento continuam só com o marcador (has_attachment). Uma
+        # falha lendo um anexo (filestore ausente, corrompido etc.) NUNCA
+        # pode derrubar o dispatch da mensagem — antes desse recurso o fluxo
+        # nem tocava no conteúdo do anexo, então isso preserva o
+        # comportamento anterior mesmo se a leitura falhar: perde só a
+        # imagem daquele anexo, a mensagem segue normalmente com [ANEXO].
         image_attachments = []
         for att in message.attachment_ids:
             if not att.mimetype or not att.mimetype.startswith('image/'):
                 continue
-            data = att.datas
-            if isinstance(data, bytes):
-                data = data.decode('ascii')
+            try:
+                data = att.datas
+                if isinstance(data, bytes):
+                    data = data.decode('ascii')
+            except Exception:
+                _logger.exception(
+                    'Falha ao ler anexo de imagem %s (channel=%s) — seguindo sem ele.',
+                    att.id, self.id,
+                )
+                continue
             image_attachments.append({
                 'mimetype': att.mimetype,
                 'data': data,
@@ -209,61 +221,3 @@ class Channel(models.Model):
             if bot_user:
                 return super(Channel, self.with_user(bot_user)).delete_password_queue()
         return super().delete_password_queue()
-
-    def transfer_to_human(self, reason='', summary=''):
-        """
-        Transfere o atendimento do bot para um vendedor humano.
-        Atualiza attendance_type, pina o canal para os vendedores da rota
-        e envia bus para que o canal apareça no sidebar em tempo real.
-        """
-        self.ensure_one()
-
-        self.write({'attendance_type': 'human', 'seller_id': False})
-        if self.queue_id:
-            msgs = self._channel_fetch_message()
-            last_msg_id = msgs[0].get('id') if msgs else False
-            bot_queue = self.queue_id
-            bot_queue.sudo().write({
-                'end_date': datetime.datetime.now(),
-                'end_message_id': last_msg_id,
-                'bot_escalated': True,
-            })
-            bot_queue.sudo().calculate_response_times()
-            new_queue = self.env['quotation.queue'].sudo().create({
-                'channel_id': self.id,
-                'partner_id': bot_queue.partner_id.id,
-                'initial_date': datetime.datetime.now(),
-                'start_message_id': last_msg_id,
-                'attendance_type': 'human',
-            })
-            bot_queue.sudo().write({'next_queue_id': new_queue.id})
-            self.write({'queue_id': new_queue.id})
-
-        members_to_pin = self.set_members_to_pin()
-        members_to_pin.write({'is_pinned': True})
-
-        for member in members_to_pin:
-            self.env['bus.bus']._sendone(
-                member.partner_id,
-                'mail.channel/pin_unknowing_thread',
-                {
-                    'id': self.id,
-                    'isServerPinned': True,
-                    'last_interest_dt': fields.Datetime.now(),
-                    'attendance_type': 'human',
-                }
-            )
-
-        if reason or summary:
-            body = "<b>Transferido para atendimento humano</b>"
-            if reason:
-                body += f"<br/><b>Motivo:</b> {reason}"
-            if summary:
-                body += f"<br/><b>Resumo:</b> {summary}"
-            self.message_post(
-                body=body,
-                message_type="notification",
-                subtype_xmlid="mail.mt_note",
-            )
-
-        return True
