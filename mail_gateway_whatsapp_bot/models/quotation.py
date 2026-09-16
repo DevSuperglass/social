@@ -579,12 +579,14 @@ class Quotation(models.Model):
         )
 
     def item_verification_response(self):
-        """Estende o comportamento padrão (grava status_map na linha): em
-        CONFIRMAR/DESISTIR, também fecha a fila do bot e avisa o chatbot para
-        limpar a sessão — mas só quando o canal do clique realmente está em
-        atendimento bot (evita fechar a fila errada se o time de logística
-        clicar nos mesmos botões no template validacao_produto, que usa outro
-        canal). Cotação de vendedor humano (ou qualquer coisa fora dos 2
+        """Estende o comportamento padrão (grava status_map na linha).
+        NÃO fecha a fila do bot nem limpa a sessão do chatbot aqui — quem
+        decide isso é o próprio chatbot (claude_agent.py), depois de cada
+        create_quotation, checando se ainda sobra item pendente na lista do
+        cliente. Fechar aqui, no clique do botão, fechava a fila e apagava
+        o histórico da conversa mesmo com outro item da mesma lista ainda
+        em andamento — bug real de atendimento multi-item encerrado cedo
+        demais. Cotação de vendedor humano (ou qualquer coisa fora dos 2
         cenários abaixo) segue o comportamento padrão do cotacoes, sem
         nenhuma interferência daqui.
 
@@ -750,10 +752,5 @@ class Quotation(models.Model):
                     ):
                         target_quotation.set_is_loaded()
                         confirmed_line.write({'status': 'confirmed'})
-
-        channel = self.env['mail.channel'].browse(message.res_id)
-        if channel.exists() and channel.attendance_type == 'bot':
-            channel.delete_password_queue()
-            channel._notify_chatbot_clear_session(channel.id)
 
         return result

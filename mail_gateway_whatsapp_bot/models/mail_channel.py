@@ -23,13 +23,14 @@ class Channel(models.Model):
         para não bloquear o fluxo do Odoo. A resposta é enviada de volta via WhatsApp.
         """
         if self.env.context.get('is_button'):
-            # CONFIRMAR/DESISTIR já são tratados inteiramente em
-            # item_verification_response (fecha a fila e limpa a sessão do bot) —
-            # essa checagem precisa vir ANTES do bloco abaixo: como esse método
-            # também roda pra esses botões (mesmo ciclo em que a fila acabou de
-            # ser fechada), sem isso o "if not self.attendance_type" reabriria o
-            # atendimento e postaria "Atendimento iniciado pelo Bot" de novo.
-            # Só PEÇA ERRADA segue pro agente, que dispara o fluxo de alterar termos.
+            # CONFIRMAR/DESISTIR são só confirmação/desistência de um item já
+            # cotado — não geram informação nova pro agente processar (quem
+            # grava o status da linha é item_verification_response, que roda
+            # à parte, no clique do botão em si). Ela NÃO encerra o
+            # atendimento nem limpa a sessão (isso é decisão exclusiva do
+            # próprio chatbot, olhando se sobra item pendente na lista do
+            # cliente — ver claude_agent.py) — só PEÇA ERRADA segue pro
+            # agente, que dispara o fluxo de alterar termos.
             # message.body vem com tags HTML (ex.: "<span>PEÇA ERRADA</span>"),
             # por isso precisa remover antes de comparar.
             button_text = re.sub(r'<[^>]+>', '', message.body or '').strip().upper()
