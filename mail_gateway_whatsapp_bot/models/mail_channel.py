@@ -57,6 +57,23 @@ class Channel(models.Model):
         body_text = re.sub(r'<[^>]+>', '', message.body or '')
         body_text = body_text.replace('&nbsp;', ' ').replace('&amp;', '&').strip()
 
+        # Imagens vão em base64 no payload pra o chatbot poder de fato "ver"
+        # (leitura de modelo/placa/código gravado no vidro) — antes só o
+        # marcador [ANEXO] chegava, sem o conteúdo. Só mimetype image/*;
+        # áudio/documento continuam só com o marcador (has_attachment).
+        image_attachments = []
+        for att in message.attachment_ids:
+            if not att.mimetype or not att.mimetype.startswith('image/'):
+                continue
+            data = att.datas
+            if isinstance(data, bytes):
+                data = data.decode('ascii')
+            image_attachments.append({
+                'mimetype': att.mimetype,
+                'data': data,
+                'name': att.name,
+            })
+
         partner = message.author_id
         payload = {
             'channel_id': self.id,
@@ -67,6 +84,7 @@ class Channel(models.Model):
             # Foto/áudio/arquivo sem texto: o chatbot troca a mensagem vazia pelo
             # marcador [ANEXO] e pede os dados em texto, em vez de descartar.
             'has_attachment': bool(message.attachment_ids),
+            'image_attachments': image_attachments,
         }
 
         channel_id = self.id
@@ -81,7 +99,9 @@ class Channel(models.Model):
                     f'{agent_url}/webhook/whatsapp',
                     json=payload,
                     headers=headers,
-                    timeout=10,
+                    # Payload com imagem em base64 é maior e mais lento que
+                    # texto puro — 10s bastava antes, agora pode estourar.
+                    timeout=30,
                 )
 
                 if resp.status_code != 200:

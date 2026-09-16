@@ -1,7 +1,5 @@
 from odoo import fields, models, api
 
-from ..models.whatsapp_cache_notifier import _notify_cache_refresh
-
 # Crons diários do bot cujo horário (Brasília) passa a ser configurável aqui,
 # em vez de fixo no nextcall do XML — com valores separados pra dia útil
 # (segunda a sexta) e sábado. Cálculo de nextcall e offset UTC-3 (Brasília)
@@ -36,11 +34,6 @@ class ResConfigSettings(models.TransientModel):
 
     bot_idle_timeout_minutes = fields.Integer(
         string="Timeout de Ociosidade do Bot (minutos)",
-        store=True
-    )
-
-    human_escalation_attempts = fields.Integer(
-        string="Tentativas até Escalonamento Humano",
         store=True
     )
 
@@ -85,7 +78,6 @@ class ResConfigSettings(models.TransientModel):
             'ai_agent_url': config.get_param('cotacoes.ai_agent_url', 'http://localhost:8000'),
             'ai_agent_secret': config.get_param('cotacoes.ai_agent_secret', ''),
             'bot_idle_timeout_minutes': int(config.get_param('cotacoes.bot_idle_timeout_minutes', '5')),
-            'human_escalation_attempts': int(config.get_param('cotacoes.human_escalation_attempts', '50')),
         })
         for prefix, (xmlid, default_weekday, default_saturday) in _SCHEDULED_CRONS.items():
             res[f'{prefix}_weekday'] = float(config.get_param(f'cotacoes.{prefix}_weekday', default_weekday))
@@ -103,10 +95,6 @@ class ResConfigSettings(models.TransientModel):
         cron = self.env.ref('mail_gateway_whatsapp_bot.cron_close_idle_bot_attendances', raise_if_not_found=False)
         if cron:
             cron.sudo().write({'interval_number': idle_minutes, 'interval_type': 'minutes'})
-
-        escalation_attempts = self.human_escalation_attempts or 50
-        config.set_param('cotacoes.human_escalation_attempts', escalation_attempts)
-        _notify_cache_refresh(self.env, 'human_escalation_attempts')
 
         # Sempre reagenda ao salvar (não só "se mudou"): comparar valor
         # anterior x novo é frágil demais aqui — se o nextcall já estivesse
