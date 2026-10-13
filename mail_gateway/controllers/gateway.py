@@ -63,8 +63,8 @@ class GatewayController(Controller):
             _logger.debug("Received a status update, not processing further.")
             return
 
-        if request.env['mail.message'].sudo().search([('whatsapp_id', '=', messages[0].get('id'))]):
-            return
+        # A duplicidade (mesmo whatsapp_id) é filtrada pelo whatsapp_dispatcher, que só chama este endpoint
+        # para mensagem que ainda não existe no Odoo: ver worker.py (conferência em mail_message).
 
         dispatcher = (
             request.env["mail.gateway.%s" % usage]
