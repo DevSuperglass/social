@@ -10,7 +10,6 @@ _logger = logging.getLogger(__name__)
 # Maior que os 10 s que o serviço espera pelo DeepSeek: o serviço responde (com erro, se for o caso) antes de o
 # Odoo desistir, e a tela de definições nunca fica presa.
 DEEPSEEK_BALANCE_TIMEOUT_SECONDS = 15
-DEEPSEEK_BALANCE_PARAM = 'cotacoes.deepseek_balance'
 
 # Crons diários do bot cujo horário (Brasília) passa a ser configurável aqui,
 # em vez de fixo no nextcall do XML — com valores separados pra dia útil
@@ -42,13 +41,6 @@ class ResConfigSettings(models.TransientModel):
     ai_agent_secret = fields.Char(
         string="Secret do Agente IA",
         store=True
-    )
-
-    deepseek_balance = fields.Char(
-        string="Créditos DeepSeek (saldo atual)",
-        compute='_compute_deepseek_balance',
-        help="Último saldo consultado ao serviço do chatbot (as credenciais do DeepSeek ficam só no serviço). "
-             "Use o botão Consultar saldo para atualizar.",
     )
 
     bot_idle_timeout_minutes = fields.Integer(
@@ -89,15 +81,10 @@ class ResConfigSettings(models.TransientModel):
         store=True,
     )
 
-    def _compute_deepseek_balance(self):
-        last_balance = self.env['ir.config_parameter'].sudo().get_param(DEEPSEEK_BALANCE_PARAM, '')
-        for settings in self:
-            settings.deepseek_balance = last_balance
-
     def action_check_deepseek_balance(self):
-        """Botão Consultar saldo: pergunta o saldo ao serviço do chatbot e o mostra com a moeda.
+        """Botão Consultar saldo: pergunta o saldo ao serviço do chatbot e o mostra num alerta, com a moeda.
 
-        Se o serviço não responder ou devolver erro, avisa e mantém o último saldo; o erro nunca quebra a tela."""
+        Se o serviço não responder ou devolver erro, o alerta traz a mensagem e a tela segue intacta."""
         self.ensure_one()
         if not self.env.user.has_group('cotacoes.group_quotation_administrator_user'):
             raise AccessError(_("Apenas administradores de cotações podem consultar o saldo do DeepSeek."))
@@ -107,12 +94,8 @@ class ResConfigSettings(models.TransientModel):
         try:
             balance = self._request_deepseek_balance(agent_url, agent_secret)
         except UserError as error:
-            return self._balance_notification(error.args[0], 'warning', sticky=True)
-        config.set_param(DEEPSEEK_BALANCE_PARAM, balance)
-        action = self._balance_notification(balance, 'success', sticky=False)
-        # recarrega a tela para o campo mostrar o saldo novo
-        action['params']['next'] = {'type': 'ir.actions.client', 'tag': 'soft_reload'}
-        return action
+            return self._balance_notification(error.args[0], 'warning')
+        return self._balance_notification(balance, 'success')
 
     def _request_deepseek_balance(self, agent_url, agent_secret):
         """Saldo no formato '110.00 CNY'. Levanta UserError (mensagem clara) em qualquer falha."""
@@ -160,7 +143,7 @@ class ResConfigSettings(models.TransientModel):
                  status=response.status_code)
 
     @api.model
-    def _balance_notification(self, message, level, sticky):
+    def _balance_notification(self, message, level):
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -168,7 +151,7 @@ class ResConfigSettings(models.TransientModel):
                 'title': _("Créditos DeepSeek"),
                 'message': message,
                 'type': level,
-                'sticky': sticky,
+                'sticky': True,
             },
         }
 
