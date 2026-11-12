@@ -30,6 +30,16 @@
                         </div>
                         <div class="col-lg-6 o_setting_box">
                             <div class="o_setting_right_pane">
+                                <span class="o_form_label">Créditos DeepSeek</span>
+                                <div class="text-muted">
+                                    Consulta o saldo de créditos do DeepSeek no serviço do chatbot
+                                </div>
+                                <button name="action_check_deepseek_balance" type="object"
+                                        string="Consultar saldo" class="btn-link" icon="fa-refresh"/>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
                                 <label for="bot_idle_timeout_minutes"/>
                                 <div class="text-muted">
                                     Tempo em minutos sem resposta do cliente para encerrar atendimento bot
